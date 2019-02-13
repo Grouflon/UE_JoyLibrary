@@ -5,7 +5,7 @@
 JOYLIBRARY_API UEnum* GetEnumType(const FString& _enumName);
 
 template<typename TEnum>
-JOYLIBRARY_API extern FORCEINLINE FString EnumToName(const FString& EnumName, TEnum Value)
+JOYLIBRARY_API FORCEINLINE FString EnumToName(const FString& EnumName, TEnum Value)
 {
 	const UEnum* enumPtr = GetEnumType(EnumName);
 	if (!enumPtr)
@@ -16,7 +16,7 @@ JOYLIBRARY_API extern FORCEINLINE FString EnumToName(const FString& EnumName, TE
 }
 
 template<typename TEnum>
-JOYLIBRARY_API extern FORCEINLINE FString EnumToDisplayName(const FString& EnumName, TEnum Value)
+JOYLIBRARY_API FORCEINLINE FString EnumToDisplayName(const FString& EnumName, TEnum Value)
 {
 	const UEnum* enumPtr = GetEnumType(EnumName);
 	if (!enumPtr)
@@ -27,7 +27,7 @@ JOYLIBRARY_API extern FORCEINLINE FString EnumToDisplayName(const FString& EnumN
 }
 
 template <typename EnumType>
-JOYLIBRARY_API extern FORCEINLINE EnumType NameToEnum(const FString& EnumName, const FString& String)
+JOYLIBRARY_API FORCEINLINE EnumType NameToEnum(const FString& EnumName, const FString& String)
 {
 	UEnum* Enum = GetEnumType(EnumName);
 	if (!Enum)

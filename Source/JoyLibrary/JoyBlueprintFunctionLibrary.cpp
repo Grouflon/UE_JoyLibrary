@@ -16,7 +16,7 @@
 #include <Assert.h>
 #include <DebugTools.h>
 #include <SplineTools.h>
-#include <Math.h>
+#include <MathTools.h>
 #include <JoyGameInstance.h>
 
 int UJoyBlueprintFunctionLibrary::GetCurrentFrameNumber()

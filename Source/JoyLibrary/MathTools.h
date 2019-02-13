@@ -1,6 +1,6 @@
 #pragma once
 
-#include "CoreMinimal.h"
+#include <CoreMinimal.h>
 #include <UnrealMathUtility.h>
 
 template<typename T>

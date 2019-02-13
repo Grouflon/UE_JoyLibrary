@@ -7,7 +7,7 @@
 #include "Smoother.generated.h"
 
 template<typename T>
-JOYLIBRARY_API void DampSpring(T& _v0, const T& _target, T& _vel, float _time90, float _dt)
+JOYLIBRARY_API FORCEINLINE void DampSpring(T& _v0, const T& _target, T& _vel, float _time90, float _dt)
 {
 	if (_time90 <= SMALL_NUMBER)
 	{
