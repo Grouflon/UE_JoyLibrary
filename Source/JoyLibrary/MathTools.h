@@ -186,3 +186,6 @@ JOYLIBRARY_API FORCEINLINE bool LineSphereIntersection(const FVector& _lineStart
 JOYLIBRARY_API bool IsPointInSphere(const FVector _sphereCenter, const float _sphereRadius, const FVector _pointToTest);
 
 JOYLIBRARY_API bool IsPointInCone(const FVector _origin, const FVector _direction, const float _angleInDegree, const float _distance, const FVector _pointToTest);
+
+JOYLIBRARY_API void GetBoxVertices(FBox _box, FVector *_result);
+

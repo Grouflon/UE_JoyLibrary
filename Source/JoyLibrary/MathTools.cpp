@@ -19,3 +19,25 @@ bool IsPointInCone(const FVector _origin, const FVector _direction, const float 
 
 	return (false);
 }
+
+void GetBoxVertices(FBox _box, FVector *_result)
+{
+	// Get Box Min Max Point
+	FVector minBox = _box.GetExtrema(0);
+	FVector maxBox = _box.GetExtrema(1);
+
+	// Lower Points
+	_result[0] = FVector(maxBox.X, maxBox.Y, minBox.Z);
+	_result[1] = FVector(maxBox.X, minBox.Y, minBox.Z);
+
+	_result[2] = FVector(minBox.X, maxBox.Y, minBox.Z);
+	_result[3] = FVector(minBox.X, minBox.Y, minBox.Z);
+
+	// Upper Points
+	_result[4] = FVector(maxBox.X, maxBox.Y, maxBox.Z);
+	_result[5] = FVector(maxBox.X, minBox.Y, maxBox.Z);
+
+	_result[6] = FVector(minBox.X, maxBox.Y, maxBox.Z);
+	_result[7] = FVector(minBox.X, minBox.Y, maxBox.Z);
+}
+
