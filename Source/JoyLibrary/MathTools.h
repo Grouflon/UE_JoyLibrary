@@ -3,6 +3,9 @@
 #include <CoreMinimal.h>
 #include <UnrealMathUtility.h>
 
+#define R2D (180.f / PI)
+#define D2R (PI / 180.f)
+
 template<typename T>
 JOYLIBRARY_API FORCEINLINE bool IsNaN(T _value)
 {
