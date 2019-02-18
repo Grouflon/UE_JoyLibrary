@@ -155,6 +155,16 @@ float UJoyBlueprintFunctionLibrary::SignedAngleBetween(const FVector& _A, const 
 	return FMath::RadiansToDegrees(::SignedAngleBetween(_A, _B, _UpVector));
 }
 
+FVector UJoyBlueprintFunctionLibrary::GetRandomPointAroundLocationInTorus(FVector _location, FVector _direction, float _innerRadius, float _outterRadius)
+{
+	return (::GetRandomPointAroundLocationInTorus(_location, _direction, _innerRadius, _outterRadius));
+}
+
+FVector UJoyBlueprintFunctionLibrary::GetPredictedShootLocation(FVector _fromLocation, FVector _targetLocation, FVector _targetVelocity, float _projectileSpeed)
+{
+	return (::GetPredictedShootLocation(_fromLocation, _targetLocation, _targetVelocity, _projectileSpeed));
+}
+
 float UJoyBlueprintFunctionLibrary::FindDistanceAlongSplineClosestToWorldLocation(const USplineComponent* _spline, const FVector& _worldLocation)
 {
 	return ::FindDistanceAlongSplineClosestToWorldLocation(_spline, _worldLocation);

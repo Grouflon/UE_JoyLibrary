@@ -54,6 +54,8 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Joy|Math") static float ComputeSquaredDistanceToPoint(const FBox2D& _box, const FVector2D& _point);
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Joy|Math") static float AngleBetween(const FVector& _A, const FVector& _B);
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Joy|Math", meta = (AdvancedDisplay = 2)) static float SignedAngleBetween(const FVector& _A, const FVector& _B, FVector _UpVector = FVector::UpVector);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Joy|Math", meta = (ToolTip = "Return Random Location Around Target Location")) static FVector GetRandomPointAroundLocationInTorus(FVector _location, FVector _direction, float _innerRadius, float _outterRadius);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Joy|Math", meta = (ToolTip = "Return Predicted Location Where To Shoot"))  static FVector GetPredictedShootLocation(FVector _fromLocation, FVector _targetLocation, FVector _targetVelocity, float _projectileSpeed);
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Joy|Spline") static float FindDistanceAlongSplineClosestToWorldLocation(const USplineComponent* _spline, const FVector& _worldLocation);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Joy") static FBox GetActorVisualBounds(const AActor* _actor);
@@ -66,3 +68,5 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Joy|Animation") static FTransform ConsumeRootMotion(USkeletalMeshComponent* _skeletalMeshComponent);
 
 };
+
+ 

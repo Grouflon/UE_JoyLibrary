@@ -48,6 +48,6 @@ FVector GetRandomPointAroundLocationInTorus(FVector _location, FVector _directio
 
 FVector GetPredictedShootLocation(FVector _fromLocation, FVector _targetLocation, FVector _targetVelocity, float _projectileSpeed)
 {
-	return (_targetVelocity * ((_fromLocation - _targetLocation).Size() / _projectileSpeed));
+	return (_targetVelocity * ((_fromLocation - _targetLocation).Size() / _projectileSpeed)) + _targetLocation;
 }
 
