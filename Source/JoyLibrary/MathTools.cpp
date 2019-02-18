@@ -41,3 +41,7 @@ void GetBoxVertices(FBox _box, FVector *_result)
 	_result[7] = FVector(minBox.X, minBox.Y, maxBox.Z);
 }
 
+FVector GetRandomPointAroundLocationInTorus(FVector _location, FVector _direction, float _innerRadius, float _outterRadius)
+{
+	return (FVector::CrossProduct(UKismetMathLibrary::RandomUnitVector(), _direction) * _outterRadius).GetClampedToSize(_innerRadius, _outterRadius) + _location;
+}
