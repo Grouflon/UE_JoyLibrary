@@ -45,3 +45,9 @@ FVector GetRandomPointAroundLocationInTorus(FVector _location, FVector _directio
 {
 	return (FVector::CrossProduct(UKismetMathLibrary::RandomUnitVector(), _direction) * _outterRadius).GetClampedToSize(_innerRadius, _outterRadius) + _location;
 }
+
+FVector GetPredictedShootLocation(FVector _fromLocation, FVector _targetLocation, FVector _targetVelocity, float _projectileSpeed)
+{
+	return (_targetVelocity * ((_fromLocation - _targetLocation).Size() / _projectileSpeed));
+}
+

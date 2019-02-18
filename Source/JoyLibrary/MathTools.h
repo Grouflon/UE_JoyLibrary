@@ -193,3 +193,6 @@ JOYLIBRARY_API bool IsPointInCone(const FVector _origin, const FVector _directio
 JOYLIBRARY_API void GetBoxVertices(FBox _box, FVector *_result);
 
 JOYLIBRARY_API FVector GetRandomPointAroundLocationInTorus(FVector _location, FVector _direction, float _innerRadius, float _outterRadius);
+
+JOYLIBRARY_API FVector GetPredictedShootLocation(FVector _fromLocation, FVector _targetLocation, FVector _targetVelocity, float _projectileSpeed);
+
