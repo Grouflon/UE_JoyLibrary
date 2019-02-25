@@ -74,9 +74,15 @@ void SetActorAsDebugTarget(AActor* _actor)
 		playerController->GetHUD()->GetDebugActorList(debugList);
 	}
 
-	int32 index = debugList.Find(_actor);
-	JOY_ASSERT(index != INDEX_NONE);
-	index = (index - 2 + debugList.Num()) % debugList.Num();
-	playerController->GetHUD()->CurrentTargetIndex = index;
-	playerController->GetHUD()->NextDebugTarget();
+	int breakCount = 0;
+	while (playerController->GetHUD()->GetCurrentDebugTargetActor() != _actor)
+	{
+		playerController->GetHUD()->NextDebugTarget();
+		++breakCount;
+		if (breakCount > debugList.Num())
+		{
+			JOY_ASSERT(false);
+			break;
+		}
+	}
 }
