@@ -13,11 +13,16 @@
 	"CanContainContent": true,
 	"IsBetaVersion": false,
 	"Installed": false,
-	"Modules": [
+  "Modules": [
     {
-      "Name": "JoyLibrary",
-      "Type": "Developer",
+      "Name": "JoyLibraryRuntime",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JoyLibraryEditor",
+      "Type": "Editor",
       "LoadingPhase": "Default"
     }
-	]
+  ]
 }
