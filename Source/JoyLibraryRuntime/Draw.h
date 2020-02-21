@@ -1,5 +1,9 @@
 #pragma once
 
+class UCanvas;
+class UCurveFloat;
+class USplineComponent;
+
 #include <DrawDebugHelpers.h>
 
 // NOTE(Remi|2019/04/08): Can be overriden by outside module by defining those macros before first include (not tested)
@@ -11,11 +15,8 @@
 	#define JOY_DRAW_DEFAULT_THICKNESS (.5f)
 #endif
 
-class UCanvas;
-class UCurveFloat;
-
 #define DRAW_POINT(position, color, thickness) DrawDebugPoint(GetWorld(), position, thickness, color)
-#define DRAW_POINT_SIMPLE(position) DRAW_POINT(position, JOY_DRAW_DEFAULT_COLOR, JOY_DRAW_DEFAULT_THICKNESS)
+#define DRAW_POINT_SIMPLE(position) DRAW_POINT(position, JOY_DRAW_DEFAULT_COLOR, 5.f)
 
 #define DRAW_LINE(start, end, color, thickness) DrawDebugLine(GetWorld(), start, end, color, false, -1.f, 0.f, thickness)
 #define DRAW_LINE_SIMPLE(start, end) DRAW_LINE(start, end, JOY_DRAW_DEFAULT_COLOR, JOY_DRAW_DEFAULT_THICKNESS)
@@ -51,8 +52,17 @@ JOYLIBRARYRUNTIME_API void DrawDebugVector(const UWorld* _world, const FVector& 
 JOYLIBRARYRUNTIME_API void DrawDebugPlane(const UWorld* _world, const FVector& _referencePoint, const FPlane& _plane, float _planeSize, const FColor& _color = JOY_DRAW_DEFAULT_COLOR, bool _bPersistentLines = false, float _lifeTime = -1.f, uint8 _depthPriority = 0, float _thickness = 0);
 JOYLIBRARYRUNTIME_API void DrawDebugCapsule(const UWorld* _world, const FVector& _start, const FVector& _end, float _radius, const FColor& _color = JOY_DRAW_DEFAULT_COLOR, bool _bPersistentLines = false, float _lifeTime = -1.f, uint8 _depthPriority = 0, float _thickness = 0);
 
-JOYLIBRARYRUNTIME_API void DrawDebug2DCone(const UWorld* _world, const FVector& _location, const FQuat& _rotation, float _halfHangleDeg, float _length, const FColor& _color = JOY_DRAW_DEFAULT_COLOR, uint32 _samplingSteps = 32);
+JOYLIBRARYRUNTIME_API void DrawDebug2DCone(const UWorld* _world, const FVector& _location, const FQuat& _rotation, float _halfHangleDeg, float _length, const FColor& _color = JOY_DRAW_DEFAULT_COLOR, uint32 _samplingSteps = 32, bool _bPersistentLines = false, float _lifeTime = -1.f, uint8 _depthPriority = 0);
+JOYLIBRARYRUNTIME_API void DrawDebug2DConeOutline(const UWorld* _world, const FVector& _location, const FQuat& _rotation, float _halfHangleDeg, float _length, const FColor& _color = JOY_DRAW_DEFAULT_COLOR, uint32 _samplingSteps = 32, bool _bPersistentLines = false, float _lifeTime = -1.f, uint8 _depthPriority = 0, float _thickness = 0);
 JOYLIBRARYRUNTIME_API void DrawPrimitiveComponent(const UPrimitiveComponent* _component, FColor _color = JOY_DRAW_DEFAULT_COLOR, float _thickness = JOY_DRAW_DEFAULT_THICKNESS);
+
+enum EDrawSplineComponentFlags
+{
+	DrawSplineComponent_Curve = 1 << 0,
+	DrawSplineComponent_Points = 1 << 1,
+	DrawSplineComponent_Tangents = 1 << 2,
+};
+JOYLIBRARYRUNTIME_API void DrawSplineComponent(const UWorld* _world, const USplineComponent* _spline, const FColor& _color = JOY_DRAW_DEFAULT_COLOR, bool _bPersistentLines = false, float _lifeTime = -1.f, uint8 _depthPriority = 0, float _thickness = 1.f, uint8 _drawFlags = (DrawSplineComponent_Curve | DrawSplineComponent_Points), uint8 _segmentIterationCount = 16);
 
 JOYLIBRARYRUNTIME_API void DrawDebugCanvasString(UCanvas* _canvas, FVector2D _location, const FString& _string, FColor _color);
 JOYLIBRARYRUNTIME_API void DrawDebugCanvasCurve(UCanvas* _canvas, UCurveFloat* _curve, FBox2D _location, float _curveXMin, float _curveXMax, float _curveValue, const FString& _curveName, FColor _curveColor = FColor::Red, FColor _valueColor = FColor::Yellow, uint32 _samplesCount = 64);

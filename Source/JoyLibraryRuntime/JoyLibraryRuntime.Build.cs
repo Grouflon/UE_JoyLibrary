@@ -41,7 +41,8 @@ public class JoyLibraryRuntime : ModuleRules
                 "InputCore",
                 "UMG",
                 "AIModule",
-                "NavigationSystem",/*
+                "NavigationSystem",
+                "Settings",/*
                 "AnimationModifiers"*/
 				// ... add private dependencies that you statically link with here ...
 			}

@@ -1,6 +1,7 @@
 #pragma once
 
 class ARecastNavMesh;
+class UPrimitiveComponent;
 
 // Unreal includes
 #include <CoreMinimal.h>
@@ -20,6 +21,10 @@ class JOYLIBRARYRUNTIME_API UNavigationTool : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject")) static ARecastNavMesh* GetRecastNavMesh(UObject* WorldContextObject, FString _navMeshName);
+
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"), Category = "Joylibrary|Navigation") static void SetDynamicObstacle(UObject* WorldContextObject, UShapeComponent* _shapeComponent, bool _dynamicObstacle);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "Joylibrary|Navigation") static bool IsDynamicObstacle(UObject* WorldContextObject, UShapeComponent* _shapeComponent);
+
 }; 
 
  

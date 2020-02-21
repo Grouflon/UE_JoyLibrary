@@ -8,7 +8,7 @@ UEnum* GetEnumType(const FString& _enumTypeName)
 	return FindObject<UEnum>(ANY_PACKAGE, *_enumTypeName, true);
 }
 
-void IncrementBitMask(const UEnum* _enum, uint32& _bitMask)
+uint32 IncrementBitMask(const UEnum* _enum, uint32 _bitMask)
 {
 	int32 enumSize = _enum->NumEnums() - 1; // NOTE: Unreal automatically adds a MAX value to the enum, so it will have 1 more element than expected.
 
@@ -27,6 +27,7 @@ void IncrementBitMask(const UEnum* _enum, uint32& _bitMask)
 			}
 		}
 	}
+	return _bitMask;
 }
 
 FString GetBitMaskString(const UEnum* _enum, uint32 _bitMask)

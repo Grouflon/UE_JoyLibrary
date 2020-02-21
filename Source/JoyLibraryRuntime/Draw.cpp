@@ -5,6 +5,7 @@
 #include <Components/SphereComponent.h>
 #include <Components/BoxComponent.h>
 #include <Components/CapsuleComponent.h>
+#include <Components/SplineComponent.h>
 
 #include <MathTools.h>
 
@@ -32,7 +33,7 @@ void DrawDebugCapsule(const UWorld* _world, const FVector& _start, const FVector
 	DrawDebugCapsule(_world, center, capsuleLength.Size() * .5f + _radius, _radius, rotation, _color, false, -1.f, 0, _thickness);
 }
 
-void DrawDebug2DCone(const UWorld* _world, const FVector& _location, const FQuat& _rotation, float _halfHangleDeg, float _length, const FColor& _color, uint32 _samplingSteps /*= 32*/)
+void DrawDebug2DCone(const UWorld* _world, const FVector& _location, const FQuat& _rotation, float _halfHangleDeg, float _length, const FColor& _color, uint32 _samplingSteps /*= 32*/, bool _bPersistentLines /*= false*/, float _lifeTime /*= -1.f*/, uint8 _depthPriority /*= 0*/)
 {
 	if (_samplingSteps <= 0)
 		return;
@@ -43,7 +44,7 @@ void DrawDebug2DCone(const UWorld* _world, const FVector& _location, const FQuat
 	vertices.Add(_location);
 
 	float step = _halfHangleDeg * 2.f / float(_samplingSteps);
-	for (uint32 i = 0; i < _samplingSteps - 1; ++i)
+	for (uint32 i = 0; i < _samplingSteps; ++i)
 	{
 		float a1 = -_halfHangleDeg + i * step;
 		float a2 = -_halfHangleDeg + (i + 1) * step;
@@ -55,7 +56,25 @@ void DrawDebug2DCone(const UWorld* _world, const FVector& _location, const FQuat
 		indices.Add(1 + i * 2 + 1);
 	}
 
-	DrawDebugMesh(_world, vertices, indices, _color);
+	DrawDebugMesh(_world, vertices, indices, _color, _bPersistentLines, _lifeTime, _depthPriority);
+}
+
+void DrawDebug2DConeOutline(const UWorld* _world, const FVector& _location, const FQuat& _rotation, float _halfHangleDeg, float _length, const FColor& _color /*= JOY_DRAW_DEFAULT_COLOR*/, uint32 _samplingSteps /*= 32*/, bool _bPersistentLines /*= false*/, float _lifeTime /*= -1.f*/, uint8 _depthPriority /*= 0*/, float _thickness /*= 0*/)
+{
+	float step = _halfHangleDeg * 2.f / float(_samplingSteps);
+	for (uint32 i = 0; i < _samplingSteps; ++i)
+	{
+		float a1 = -_halfHangleDeg + i * step;
+		float a2 = -_halfHangleDeg + (i + 1) * step;
+
+		FVector p1 = _location + (_rotation.GetForwardVector() * _length).RotateAngleAxis(a1, _rotation.GetUpVector());
+		FVector p2 = _location + (_rotation.GetForwardVector() * _length).RotateAngleAxis(a2, _rotation.GetUpVector());
+
+		DrawDebugLine(_world, p1, p2, _color, _bPersistentLines, _lifeTime, _depthPriority, _thickness);
+	}
+
+	DrawDebugLine(_world, _location, _location + (_rotation.GetForwardVector() * _length).RotateAngleAxis(-_halfHangleDeg, _rotation.GetUpVector()), _color, _bPersistentLines, _lifeTime, _depthPriority, _thickness);
+	DrawDebugLine(_world, _location, _location + (_rotation.GetForwardVector() * _length).RotateAngleAxis(_halfHangleDeg, _rotation.GetUpVector()), _color, _bPersistentLines, _lifeTime, _depthPriority, _thickness);
 }
 
 void DrawPrimitiveComponent(const UPrimitiveComponent* _component, FColor _color, float _thickness)
@@ -74,6 +93,59 @@ void DrawPrimitiveComponent(const UPrimitiveComponent* _component, FColor _color
 	else if (const UCapsuleComponent* capsule = Cast<UCapsuleComponent>(_component))
 	{
 		DrawDebugCapsule(capsule->GetWorld(), capsule->GetComponentLocation(), capsule->GetScaledCapsuleHalfHeight(), capsule->GetScaledCapsuleRadius(), capsule->GetComponentQuat(), _color, false, -1.f, 0, _thickness);
+	}
+}
+
+void DrawSplineComponent(const UWorld* _world, const USplineComponent* _spline, const FColor& _color /*= JOY_DRAW_DEFAULT_COLOR*/, bool _bPersistentLines /*= false*/, float _lifeTime /*= -1.f*/, uint8 _depthPriority /*= 0*/, float _thickness /*= 1.f*/, uint8 _drawFlags /*= (DrawSplineComponent_Curve | DrawSplineComponent_Points)*/, uint8 _segmentIterationCount /*= 16*/)
+{
+	if (!_spline)
+		return;
+
+	FTransform transform = _spline->GetComponentTransform();
+
+	for (size_t i = 0; i < _spline->SplineCurves.Position.Points.Num(); ++i)
+	{
+		auto& point = _spline->SplineCurves.Position.Points[i];
+		FVector pointLocation = transform.TransformPosition(point.OutVal);
+
+		if (_drawFlags & DrawSplineComponent_Points)
+			DrawDebugPoint(_world, pointLocation, _thickness * 2.f, _color, _bPersistentLines, _lifeTime, _depthPriority);
+
+		if (_drawFlags & DrawSplineComponent_Tangents)
+		{
+			FVector arriveTangent = transform.TransformPosition(point.OutVal - point.ArriveTangent);
+			FVector leaveTangent = transform.TransformPosition(point.OutVal + point.LeaveTangent);
+
+			DrawDebugLine(_world, pointLocation, arriveTangent, _color, _bPersistentLines, _lifeTime, _depthPriority, _thickness * .5f);
+			DrawDebugPoint(_world, arriveTangent, _thickness, _color, _bPersistentLines, _lifeTime, _depthPriority);
+
+			DrawDebugLine(_world, pointLocation, leaveTangent, _color, _bPersistentLines, _lifeTime, _depthPriority, _thickness * .5f);
+			DrawDebugPoint(_world, leaveTangent, _thickness, _color, _bPersistentLines, _lifeTime, _depthPriority);
+		}
+
+		if (_drawFlags & DrawSplineComponent_Curve && _segmentIterationCount > 0)
+		{
+			if (i >= _spline->SplineCurves.Position.Points.Num() - 1 && !_spline->IsClosedLoop())
+				break;
+
+			auto& nextPoint = _spline->SplineCurves.Position.Points[(i + 1) % _spline->SplineCurves.Position.Points.Num()];
+
+			float nextPointVal = nextPoint.InVal;
+			if (nextPointVal == 0.f) // Looping splines special case
+				nextPointVal = point.InVal + 1.f;
+
+			float interval = (nextPointVal - point.InVal) / float(_segmentIterationCount);
+			for (size_t j = 0u; j < _segmentIterationCount; ++j)
+			{
+				float timeBegin = point.InVal + float(j) * interval;
+				float timeEnd = point.InVal + float(j + 1) * interval;
+
+				FVector begin = _spline->GetLocationAtSplineInputKey(timeBegin, ESplineCoordinateSpace::World);
+				FVector end = _spline->GetLocationAtSplineInputKey(timeEnd, ESplineCoordinateSpace::World);
+
+				DrawDebugLine(_world, begin, end, _color, _bPersistentLines, _lifeTime, _depthPriority, _thickness);
+			}
+		}
 	}
 }
 

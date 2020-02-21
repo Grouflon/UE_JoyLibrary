@@ -11,6 +11,11 @@
 
 #include <Kismet/GameplayStatics.h> 
 
+#include <Engine.h>
+
+// Plugins includes
+#include <Assert.h>
+
 ARecastNavMesh* GetRecastNavMesh(const UObject* _worldContextObject, FString _navMeshName)
 {
 	ARecastNavMesh* selectedRecastNavMesh = nullptr;
@@ -19,17 +24,20 @@ ARecastNavMesh* GetRecastNavMesh(const UObject* _worldContextObject, FString _na
 	UGameplayStatics::GetAllActorsOfClass(_worldContextObject, ARecastNavMesh::StaticClass(), recastsNavMeshes);
 	for (AActor* currentActor : recastsNavMeshes)
 	{
-		ARecastNavMesh* navMesh = Cast<ARecastNavMesh>(currentActor);
-		if (navMesh->GetName().Contains(_navMeshName))
+		if (!currentActor->IsPendingKill())
 		{
+			ARecastNavMesh* navMesh = Cast<ARecastNavMesh>(currentActor);
+			if (navMesh->GetName().Contains(_navMeshName))
+			{
 #if JOY_ASSERT_ENABLED 
-			JOY_ASSERT_MSG(!selectedRecastNavMesh, TEXT("Looks like you have multiple identical RecastNavMesh actor in your level"));
-			selectedRecastNavMesh = navMesh;
+				JOY_ASSERT_MSG(!selectedRecastNavMesh, TEXT("Looks like you have multiple identical RecastNavMesh actor in your level"));
+				selectedRecastNavMesh = navMesh;
 #else
-			selectedRecastNavMesh = navMesh;
-			break;
+				selectedRecastNavMesh = navMesh;
+				break;
 #endif
-		} 
+			}
+		}
 	}
 	if (selectedRecastNavMesh == nullptr) 
 	{
@@ -42,9 +50,23 @@ ARecastNavMesh* GetRecastNavMesh(const UObject* _worldContextObject, FString _na
 	return selectedRecastNavMesh;
 }
 
-
 ARecastNavMesh* UNavigationTool::GetRecastNavMesh(UObject* WorldContextObject, FString _navMeshName)
 {
 	return ::GetRecastNavMesh(WorldContextObject->GetWorld(), _navMeshName);
 }
+
+void UNavigationTool::SetDynamicObstacle(UObject* WorldContextObject, UShapeComponent* _shapeComponent, bool _dynamicObstacle)
+{
+	JOY_EXITCONDITION(!_shapeComponent, TEXT("Undefined ShapeComponent."));
+
+	_shapeComponent->bDynamicObstacle = _dynamicObstacle;
+}
+
+bool UNavigationTool::IsDynamicObstacle(UObject* WorldContextObject, UShapeComponent* _shapeComponent)
+{
+	JOY_EXITCONDITION_RET(!_shapeComponent, false, TEXT("Undefined ShapeComponent."));
+	
+	return _shapeComponent->bDynamicObstacle;
+}
+
 

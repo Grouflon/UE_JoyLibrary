@@ -134,6 +134,14 @@ JOYLIBRARYRUNTIME_API FORCEINLINE T TimeIndependentLerp(T _base, T _target, floa
 	return FMath::Lerp(_base, _target, (1.f - FMath::Pow(_ratio, _dt)));
 }
 
+// NOTE(Remi|2019/05/30): See http://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/
+template <typename T>
+JOYLIBRARYRUNTIME_API FORCEINLINE T TimeIndependentLerp2(T _base, T _target, float _timeTo90, float _dt)
+{
+	float lambda = -FMath::Loge(1.f - 0.9f) / _timeTo90;
+	return FMath::Lerp(_base, _target, 1 - FMath::Exp(-lambda * _dt));
+}
+
 template <typename T>
 JOYLIBRARYRUNTIME_API FORCEINLINE bool LineSphereIntersection(const T& _lineStart, const T& _lineEnd, const T& _sphereCenter, float _sphereRadius, float* _outT1 = nullptr, float* _outT2 = nullptr)
 {
@@ -208,6 +216,49 @@ JOYLIBRARYRUNTIME_API FORCEINLINE bool SegmentSphereIntersection(const T& _segme
 	return false;
 }
 
+JOYLIBRARYRUNTIME_API FORCEINLINE FVector FindClosestPointOnSegment(const FVector& _point, const FVector& _segmentStart, const FVector& _segmentEnd)
+{
+	FVector ab = _segmentEnd - _segmentStart;
+	FVector av = _point - _segmentStart;
+
+	float d1 = FVector::DotProduct(av, ab);
+	if (d1 <= 0.0) // Point is lagging behind start of the segment, so perpendicular distance is not viable.
+		return _segmentStart;
+
+	FVector bv = _point - _segmentEnd;
+
+	if (FVector::DotProduct(bv, ab) >= 0.0) // Point is advanced past the end of the segment, so perpendicular distance is not viable.
+		return _segmentEnd;
+
+	return _segmentStart + d1 / FVector::DotProduct(ab, ab) * ab;
+}
+
+JOYLIBRARYRUNTIME_API FORCEINLINE bool SegmentIntersectionOnPlaneSpace(const FVector& _A1, const FVector& _A2, const FVector& _B1, const FVector& _B2, const FPlane& _plane, FVector& _outIntersection)
+{
+	FTransform mat = FTransform(FRotationMatrix::MakeFromZ(_plane).ToQuat(), _plane * _plane.W, FVector::OneVector);
+	FTransform invMat = mat.Inverse();
+
+	FVector a1 = invMat.TransformPosition(_A1);
+	FVector a2 = invMat.TransformPosition(_A2);
+	FVector b1 = invMat.TransformPosition(_B1);
+	FVector b2 = invMat.TransformPosition(_B2);
+
+	if (!FMath::SegmentIntersection2D(a1, a2, b1, b2, _outIntersection))
+		return false;
+
+	_outIntersection = mat.TransformPosition(_outIntersection);
+	return true;
+}
+
+/**
+   Calculate the line segment resultA > resultB that is the shortest route between
+   two lines A and B. Calculate also the values of ARatio and BRatio where
+	  resultA = A1 + ARatio (A2 - A1)
+	  resultB = B1 + BRatio (B2 - B1)
+   Return false if no solution exists.
+*/
+JOYLIBRARYRUNTIME_API bool LineLineShortestRoute(const FVector& _lineA1, const FVector& _lineA2, const FVector& _lineB1, const FVector& _lineB2, FVector* _resultA = nullptr, FVector* _resultB = nullptr, float* _ARatio = nullptr, float* _BRatio = nullptr);
+
 JOYLIBRARYRUNTIME_API bool IsPointInSphere(const FVector _sphereCenter, const float _sphereRadius, const FVector _pointToTest);
 
 JOYLIBRARYRUNTIME_API bool IsPointInCone(const FVector _origin, const FVector _direction, const float _angleInDegree, const float _distance, const FVector _pointToTest);
@@ -218,6 +269,12 @@ JOYLIBRARYRUNTIME_API FVector GetRandomPointAroundLocationInTorus(FVector _locat
 
 JOYLIBRARYRUNTIME_API FVector GetPredictedShootLocation(FVector _fromLocation, FVector _targetLocation, FVector _targetVelocity, float _projectileSpeed);
 
+JOYLIBRARYRUNTIME_API FPlane TransformPlane(const FTransform& _transform, const FPlane& _plane);
+
+JOYLIBRARYRUNTIME_API FTransform TransformRelativeToMovement(const FTransform& _transform, const FTransform& _previousMovingTransform, const FTransform& _currentMovingTransform);
+JOYLIBRARYRUNTIME_API FVector TransformRelativeToMovement(const FVector& _point, const FTransform& _previousMovingTransform, const FTransform& _currentMovingTransform);
+JOYLIBRARYRUNTIME_API FQuat TransformRelativeToMovement(const FQuat& _rotation, const FTransform& _previousMovingTransform, const FTransform& _currentMovingTransform);
+JOYLIBRARYRUNTIME_API FPlane TransformRelativeToMovement(const FPlane& _plane, const FTransform& _previousMovingTransform, const FTransform& _currentMovingTransform);
 
 /**
  *
@@ -231,11 +288,41 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FRotator QuatToRotator(const FQuat& _quat);
 	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FQuat RotatorToQuat(const FRotator& _rotator);
 
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static float TimeIndependentLerpFloat(float _base, float _target, float _timeTo90, float _dt);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector TimeIndependentLerpVector(const FVector& _base, const FVector& _target, float _timeTo90, float _dt);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector2D TimeIndependentLerpVector2D(const FVector2D& _base, const FVector2D& _target, float _timeTo90, float _dt);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FRotator TimeIndependentLerpRotator(const FRotator& _base, const FRotator& _target, float _timeTo90, float _dt);
+
 	UFUNCTION(BlueprintPure, Category = "Joy|Math") static bool IsNearlyZero(float _value, float _tolerance = 0.00001f);
 	UFUNCTION(BlueprintPure, Category = "Joy|Math") static bool LineSphereIntersection(const FVector& _lineStart, const FVector& _lineEnd, const FVector& _sphereCenter, float _sphereRadius, float& _outT1, float& _outT2);
 	UFUNCTION(BlueprintPure, Category = "Joy|Math") static bool SegmentSphereIntersection(const FVector& _segmentStart, const FVector& _segmentEnd, const FVector& _sphereCenter, float _sphereRadius, float& _outT1, float& _outT2);
 	UFUNCTION(BlueprintPure, Category = "Joy|Math") static bool LineSphereIntersection2D(const FVector2D& _lineStart, const FVector2D& _lineEnd, const FVector2D& _sphereCenter, float _sphereRadius, float& _outT1, float& _outT2);
 	UFUNCTION(BlueprintPure, Category = "Joy|Math") static bool SegmentSphereIntersection2D(const FVector2D& _segmentStart, const FVector2D& _segmentEnd, const FVector2D& _sphereCenter, float _sphereRadius, float& _outT1, float& _outT2);
+
+	/**
+	   Calculate the line segment resultA > resultB that is the shortest route between
+	   two lines A and B. Calculate also the values of ARatio and BRatio where
+		  resultA = A1 + ARatio (A2 - A1)
+		  resultB = B1 + BRatio (B2 - B1)
+	   Return false if no solution exists.
+	*/
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static bool LineLineShortestRoute(const FVector& _lineA1, const FVector& _lineA2, const FVector& _lineB1, const FVector& _lineB2, FVector& _resultA, FVector& _resultB, float& _ARatio, float& _BRatio);
+
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector GetClosestPointToBox(const FBox& _box, const FVector& _point);
+
+	UFUNCTION(BlueprintPure, Category = "Joy|Math|Rotator", meta = (ToolTip = "Return the shortest angle between two rotators (in degrees)")) static float GetAngleBetweenRotators(const FRotator& _A, const FRotator& _B);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math|Rotator", meta = (ToolTip = "Return the shortest signed angle between two rotators (in degrees)")) static float GetSignedAngleBetweenRotators(const FRotator& _A, const FRotator& _B);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector GetXY(const FVector& _vector);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector2D GetXY2D(const FVector& _vector);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector GetXZ(const FVector& _vector);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector2D GetXZ2D(const FVector& _vector);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector GetYZ(const FVector& _vector);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static FVector2D GetYZ2D(const FVector& _vector);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static float ComputeSquaredDistanceToPoint(const FBox2D& _box, const FVector2D& _point);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math") static float AngleBetween(const FVector& _A, const FVector& _B);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math", meta = (AdvancedDisplay = 2)) static float SignedAngleBetween(const FVector& _A, const FVector& _B, FVector _UpVector = FVector::UpVector);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math", meta = (ToolTip = "Return Random Location Around Target Location")) static FVector GetRandomPointAroundLocationInTorus(FVector _location, FVector _direction, float _innerRadius, float _outterRadius);
+	UFUNCTION(BlueprintPure, Category = "Joy|Math", meta = (ToolTip = "Return Predicted Location Where To Shoot"))  static FVector GetPredictedShootLocation(FVector _fromLocation, FVector _targetLocation, FVector _targetVelocity, float _projectileSpeed);
 };
 
 

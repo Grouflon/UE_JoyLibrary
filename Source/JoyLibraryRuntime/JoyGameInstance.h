@@ -10,6 +10,7 @@ class FDebugDisplayInfo;
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintPlatformLibrary.h"
+#include <Engine/World.h>
 
 #include <CoordinatesOrigin.h>
 
@@ -27,12 +28,15 @@ public:
 	virtual void OnStart() override;
 	virtual void Shutdown() override;
 
-	UFUNCTION(BlueprintCallable, BlueprintPure) AManager* GetManager(TSubclassOf<AManager> _managerClass) const;
-	template <typename T> T* GetManager() const;
+	UFUNCTION(BlueprintCallable, BlueprintPure) AManager* GetManager(TSubclassOf<AManager> _managerClass, UObject* _worldContextObject = nullptr) const;
+	template <typename T> T* GetManager(UWorld* _world = nullptr) const;
 	
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = 8)) void DrawDebugCurve(UCurveFloat* _curve, ECoordinatesOrigin _coordinatesOrigin, FVector2D _position, FVector2D _size, float _curveXMin, float _curveXMax, float _curveValue, const FString& _curveName, FColor _curveColor = FColor::Red, FColor _valueColor = FColor::Yellow, int _samplesCount = 64);
 
-	void _InstantiateManagers();
+private:
+	void _OnPostWorldInitialization(UWorld* World, const UWorld::InitializationValues IVS);
+
+	void _InstantiateManagers(UWorld* _world = nullptr);
 	TSubclassOf<AManager> _FindDeepestChildClass(TSubclassOf<AManager> _managerClass) const;
 	void _OnHudShowDebugInfo(AHUD* _HUD, UCanvas* _canvas, const FDebugDisplayInfo& _displayInfo, float& YL, float& YPos);
 
@@ -54,7 +58,7 @@ public:
 };
 
 template <typename T>
-T* UJoyGameInstance::GetManager() const
+T* UJoyGameInstance::GetManager(UWorld* _world /*= nullptr*/) const
 {
-	return Cast<T>(GetManager(T::StaticClass()));
+	return Cast<T>(GetManager(T::StaticClass(), _world));
 }

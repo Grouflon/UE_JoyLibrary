@@ -37,6 +37,6 @@ JOYLIBRARYRUNTIME_API FORCEINLINE EnumType NameToEnum(const FName& _enumTypeName
 	return (EnumType)Enum->GetIndexByName(_name);
 }
 
-JOYLIBRARYRUNTIME_API void IncrementBitMask(const UEnum* _enum, uint32& _bitMask);
+JOYLIBRARYRUNTIME_API uint32 IncrementBitMask(const UEnum* _enum, uint32 _bitMask);
 
 JOYLIBRARYRUNTIME_API FString GetBitMaskString(const UEnum* _enum, uint32 _bitMask);

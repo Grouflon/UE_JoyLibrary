@@ -7,6 +7,7 @@
 #include <Animation/AnimInstance.h>
 #include <Animation/AnimSequence.h>
 #include <Animation/AnimSingleNodeInstance.h>
+#include <Animation/AnimStateMachineTypes.h>
 #include <Animation/BlendSpaceBase.h>
 //#include <AnimationBlueprintLibrary.h>
 #include <Components/SkeletalMeshComponent.h>
@@ -90,6 +91,38 @@ float FindAnimationNotifyTriggerTime(const UAnimSequence* _animation, FName _not
 {
 	const FAnimNotifyEvent* e = FindAnimationNotify(_animation, _notifyName);
 	return e ? e->GetTriggerTime() : 0.f;
+}
+
+float FindStateMachineTransitionCrossFadeTime(UAnimInstance* _animInstance, FName _stateMachineName, FName _fromStateName, FName _toStateName)
+{
+	int32 machineIndex = _animInstance->GetStateMachineIndex(_stateMachineName);
+	if (machineIndex == INDEX_NONE)
+	{
+		LOGF_WARNING(TEXT("Unknown State Machine \"%s\"."), *_stateMachineName.ToString());
+		return 0.f;
+	}
+	const FBakedAnimationStateMachine* machinePtr = _animInstance->GetStateMachineInstanceDesc(_stateMachineName);
+	JOY_ASSERT(machinePtr);
+	int32 fromStateIndex = machinePtr->FindStateIndex(_fromStateName);
+	if (fromStateIndex == INDEX_NONE)
+	{
+		LOGF_WARNING(TEXT("Unknown State \"%s\" in StateMachine \"%s\"."), *_stateMachineName.ToString(), *_fromStateName.ToString());
+		return 0.f;
+	}
+	int32 toStateIndex = machinePtr->FindStateIndex(_toStateName);
+	if (toStateIndex == INDEX_NONE)
+	{
+		LOGF_WARNING(TEXT("Unknown State \"%s\" in StateMachine \"%s\"."), *_stateMachineName.ToString(), *_toStateName.ToString());
+		return 0.f;
+	}
+
+	int32 transitionIndex = machinePtr->FindTransitionIndex(fromStateIndex, toStateIndex);
+	if (transitionIndex == INDEX_NONE)
+	{
+		LOGF_WARNING(TEXT("Unknown Transition from state \"%s\" to state \"%s\" in StateMachine \"%s\"."), *_fromStateName.ToString() , *_toStateName.ToString(), *_stateMachineName.ToString());
+		return 0.f;
+	}
+	return machinePtr->Transitions[transitionIndex].CrossfadeDuration;
 }
 
 bool GetBoneChain(const USkeletalMeshComponent* _skeletalMesh, const FName& _firstBone, const FName& _lastBone, TArray<FName>& _outChain)
@@ -183,6 +216,14 @@ FTransform UAnimationTools::ExtractRootMotionFromRange(const UAnimSequence* _ani
 
 	return _animationSequence->ExtractRootMotionFromRange(_startTrackPosition, _endTrackPosition);
 }
+
+FTransform UAnimationTools::ExtractRootTrackTransform(const UAnimSequence* _animationSequence, float _pos)
+{
+	JOY_EXITCONDITION_RET(_animationSequence == nullptr, FTransform::Identity, TEXT("Null Anim Sequence"));
+
+	return _animationSequence->ExtractRootTrackTransform(_pos, NULL);
+}
+
 
 float UAnimationTools::GetPlayLength(const UAnimSequence* _animationSequence)
 {

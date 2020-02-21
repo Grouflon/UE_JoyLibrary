@@ -2,8 +2,14 @@
 
 #pragma once
 
+class UCurveFloat;
+class UCanvas;
+
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+
+#include <Assert.h>
+
 #include "Smoother.generated.h"
 
 template<typename T>
@@ -36,6 +42,23 @@ JOYLIBRARYRUNTIME_API FORCEINLINE void DampSpring(T& _v0, const T& _target, T& _
 
 JOYLIBRARYRUNTIME_API void DampSpring(FQuat& _v0, const FQuat& _target, FQuat& _vel, float _time90, float _dt);
 
+
+template <typename T>
+T Average(const TArray<T>& _samples)
+{
+	JOY_ASSERT(_samples.Num() > 0);
+
+	T average = _samples[0];
+	for (int i = 1; i < _samples.Num(); ++i)
+	{
+		average += _samples[i];
+	}
+	average = average / float(_samples.Num());
+	return average;
+}
+
+FQuat Average(const TArray<FQuat>& _samples);
+
 USTRUCT(BlueprintType)
 struct JOYLIBRARYRUNTIME_API FSmootherFloat
 {
@@ -66,6 +89,206 @@ struct JOYLIBRARYRUNTIME_API FSmootherRotation
 	UPROPERTY(BlueprintReadWrite) FQuat Velocity = FQuat::Identity;
 };
 
+USTRUCT(BlueprintType)
+struct JOYLIBRARYRUNTIME_API FSmootherCurved
+{
+	GENERATED_BODY()
+
+	enum EAccelerationState
+	{
+		AS_Stable,
+		AS_Accelerating,
+		AS_Decelerating
+	};
+
+public:
+	float Update(float _target, float _dt);
+	void SetAccelerationCurve(UCurveFloat* _curve);
+	void SetDecelerationCurve(UCurveFloat* _curve);
+
+	float GetValue() const { return m_value; }
+	void SetValue(float _value);
+
+	void DisplayDebug(UCanvas* _canvas, const FBox2D& _location);
+
+private:
+	UPROPERTY(EditAnywhere, Category = "Gameplay") UCurveFloat* m_accelerationCurve = nullptr;
+	UPROPERTY(EditAnywhere, Category = "Gameplay") UCurveFloat* m_decelerationCurve = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = "Internal") float m_velocityChangeThreshold = 0.001f;
+
+	EAccelerationState m_accelerationState = AS_Stable;
+	UCurveFloat* m_currentCurve = nullptr;
+	float m_currentTimeOnCurve = 0.f;
+	float m_value = 0.f;
+};
+
+template <typename T>
+struct FNoiseSmootherT
+{
+	void Reset(T _value)
+	{
+		m_time = 0.f;
+		m_rawSamples.Empty();
+		m_value = _value;
+	}
+
+	T Update(float _dt, T _value, float _samplingTime, int _sampleCount)
+	{
+		JOY_ASSERT(_sampleCount >= 1);
+
+		m_time += _dt;
+		FSample sample;
+		sample.Time = m_time;
+		sample.Value = _value;
+		m_rawSamples.Add(sample);
+
+		m_samples.Empty();
+		m_samples.Reserve(_sampleCount);
+
+		JOY_ASSERT(m_rawSamples.Num());
+		float samplingStep = _samplingTime / float(_sampleCount);
+		int currentRawSample = m_rawSamples.Num() - 1;
+		for (int i = 0u; i < _sampleCount; ++i)
+		{
+			float t = m_time - float(i) * samplingStep;
+			T sampleValue;
+			for (int j = currentRawSample; j >= 0; --j)
+			{
+				if (j > 0)
+				{
+					if (t <= m_rawSamples[j].Time && t > m_rawSamples[j - 1].Time)
+					{
+						currentRawSample = j;
+						float ratio = (t - m_rawSamples[j].Time) / (m_rawSamples[j - 1].Time - m_rawSamples[j].Time);
+						sampleValue = FMath::Lerp(m_rawSamples[j].Value, m_rawSamples[j-1].Value, ratio);
+						break;
+					}
+				}
+				else
+				{
+					currentRawSample = j;
+					sampleValue = m_rawSamples[j].Value;
+				}
+			}
+
+			m_samples.Add(sampleValue);
+		}
+
+		if (currentRawSample > 0)
+		{
+			m_rawSamples.RemoveAt(0, currentRawSample - 1);
+		}
+
+		m_value = Average(m_samples);
+		return m_value;
+	}
+
+	T GetValue() const
+	{
+		return m_value;
+	}
+
+private:
+
+	struct FSample
+	{
+		T Value;
+		float Time = 0.f;
+	};
+
+	float m_time = 0.f;
+	TArray<FSample> m_rawSamples;
+	TArray<T> m_samples;
+	T m_value;
+};
+
+USTRUCT(BlueprintType)
+struct JOYLIBRARYRUNTIME_API FNoiseSmootherFloat
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SamplingTime = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int SampleCount = 5;
+
+	void Reset(float _value) { m_smoother.Reset(_value); }
+	float Update(float _dt, float _value) { return m_smoother.Update(_dt, _value, SamplingTime, SampleCount); }
+	float GetValue() const { return m_smoother.GetValue(); }
+
+private:
+	FNoiseSmootherT<float> m_smoother;
+};
+
+USTRUCT(BlueprintType)
+struct JOYLIBRARYRUNTIME_API FNoiseSmootherDouble
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SamplingTime = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int SampleCount = 5;
+
+	void Reset(double _value) { m_smoother.Reset(_value); }
+	double Update(float _dt, double _value) { return m_smoother.Update(_dt, _value, SamplingTime, SampleCount); }
+	double GetValue() const { return m_smoother.GetValue(); }
+
+private:
+	FNoiseSmootherT<double> m_smoother;
+};
+
+USTRUCT(BlueprintType)
+struct JOYLIBRARYRUNTIME_API FNoiseSmootherVector
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SamplingTime = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int SampleCount = 5;
+
+	void Reset(FVector _value) { m_smoother.Reset(_value); }
+	FVector Update(float _dt, FVector _value) { return m_smoother.Update(_dt, _value, SamplingTime, SampleCount); }
+	FVector GetValue() const { return m_smoother.GetValue(); }
+
+private:
+	FNoiseSmootherT<FVector> m_smoother;
+};
+
+USTRUCT(BlueprintType)
+struct JOYLIBRARYRUNTIME_API FNoiseSmootherVector2D
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SamplingTime = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int SampleCount = 5;
+
+	void Reset(FVector2D _value) { m_smoother.Reset(_value); }
+	FVector2D Update(float _dt, FVector2D _value) { return m_smoother.Update(_dt, _value, SamplingTime, SampleCount); }
+	FVector2D GetValue() const { return m_smoother.GetValue(); }
+
+private:
+	FNoiseSmootherT<FVector2D> m_smoother;
+};
+
+USTRUCT(BlueprintType)
+struct JOYLIBRARYRUNTIME_API FNoiseSmootherRotation
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SamplingTime = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int SampleCount = 5;
+
+	void Reset(FQuat _value) { m_smoother.Reset(_value); }
+	FQuat Update(float _dt, FQuat _value) { return m_smoother.Update(_dt, _value, SamplingTime, SampleCount); }
+	FQuat GetValue() const { return m_smoother.GetValue(); }
+
+private:
+	FNoiseSmootherT<FQuat> m_smoother;
+};
+
+
 /**
  * 
  */
@@ -86,7 +309,29 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void ResetSmootherRotation(UPARAM(ref) FSmootherRotation& _smoother, FRotator _value = FRotator::ZeroRotator);
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SetTimeTo90PercentRotation(UPARAM(ref) FSmootherRotation& _smoother, float _timeTo90Percent);
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static FRotator SmoothRotation(UPARAM(ref) FSmootherRotation& _smoother, FRotator _target, float _deltaTime);
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Joy|Smoother") static FRotator GetRotator(const FSmootherRotation& _smoother);
+	UFUNCTION(BlueprintPure, Category = "Joy|Smoother") static FRotator GetRotator(const FSmootherRotation& _smoother);
 	static void ResetSmootherRotation(UPARAM(ref) FSmootherRotation& _smoother, FQuat _value = FQuat::Identity);
 	static FQuat SmoothRotation(UPARAM(ref) FSmootherRotation& _smoother, FQuat _target, float _deltaTime);
+
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static float SmootherCurvedTick(UPARAM(ref) FSmootherCurved& _smoother, float _target, float _dt);
+	UFUNCTION(BlueprintPure, Category = "Joy|Smoother") static float SmootherCurvedGetValue(const FSmootherCurved& _smoother);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SmootherCurvedSetValue(UPARAM(ref) FSmootherCurved& _smoother, float _value);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SmootherCurvedSetAccelerationCurve(UPARAM(ref) FSmootherCurved& _smoother, UCurveFloat* _curve);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SmootherCurvedSetDecelerationCurve(UPARAM(ref) FSmootherCurved& _smoother, UCurveFloat* _curve);
+
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void ResetNoiseSmootherFloat(UPARAM(ref) FNoiseSmootherFloat& _noiseSmoother, float _value);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static float UpdateNoiseSmootherFloat(UPARAM(ref) FNoiseSmootherFloat& _noiseSmoother, float _dt, float _value);
+	UFUNCTION(BlueprintPure, Category = "Joy|Smoother") static float GetNoiseSmootherFloatValue(UPARAM(ref) FNoiseSmootherFloat& _noiseSmoother);
+
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void ResetNoiseSmootherVector(UPARAM(ref) FNoiseSmootherVector& _noiseSmoother, FVector _value);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static FVector UpdateNoiseSmootherVector(UPARAM(ref) FNoiseSmootherVector& _noiseSmoother, float _dt, FVector _value);
+	UFUNCTION(BlueprintPure, Category = "Joy|Smoother") static FVector GetNoiseSmootherVectorValue(UPARAM(ref) FNoiseSmootherVector& _noiseSmoother);
+
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void ResetNoiseSmootherVector2D(UPARAM(ref) FNoiseSmootherVector2D& _noiseSmoother, FVector2D _value);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static FVector2D UpdateNoiseSmootherVector2D(UPARAM(ref) FNoiseSmootherVector2D& _noiseSmoother, float _dt, FVector2D _value);
+	UFUNCTION(BlueprintPure, Category = "Joy|Smoother") static FVector2D GetNoiseSmootherVector2DValue(UPARAM(ref) FNoiseSmootherVector2D& _noiseSmoother);
+
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void ResetNoiseSmootherRotation(UPARAM(ref) FNoiseSmootherRotation& _noiseSmoother, FRotator _value);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static FRotator UpdateNoiseSmootherRotation(UPARAM(ref) FNoiseSmootherRotation& _noiseSmoother, float _dt, FRotator _value);
+	UFUNCTION(BlueprintPure, Category = "Joy|Smoother") static FRotator GetNoiseSmootherRotationValue(UPARAM(ref) FNoiseSmootherRotation& _noiseSmoother);
 };

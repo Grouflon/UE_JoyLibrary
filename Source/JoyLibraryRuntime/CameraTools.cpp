@@ -1,11 +1,14 @@
 #include "CameraTools.h"
 
+#include <Camera/CameraTypes.h>
+#include <Camera/CameraComponent.h>
 #include <Engine/World.h>
 #include <Engine/Engine.h>
 #include <Engine/GameViewportClient.h>
-#include <Camera/CameraTypes.h>
-#include <Camera/CameraComponent.h>
+#include <GameFramework/PlayerController.h>
 #include <SceneView.h>
+
+#include <Log.h>
 
 bool WorldToCameraNormalizedSpace(const FVector& _worldLocation, UCameraComponent* _camera, FVector2D* _outCameraNormalizedSpace, bool _constrained /*= true*/)
 {
@@ -84,4 +87,37 @@ FVector UCameraTools::GetCurrentViewLocation(UObject* _worldContextObject)
 		return FVector::ZeroVector;
 
 	return world->ViewLocationsRenderedLastFrame[0];
+}
+
+void UCameraTools::AddPlayerControllerHiddenActor(APlayerController* _playerController, AActor* _actor)
+{
+	JOY_EXITCONDITION(!_playerController, TEXT("PlayerController is null."));
+	JOY_EXITCONDITION(!_actor, TEXT("Actor is null."));
+
+	_playerController->HiddenActors.Add(_actor);
+}
+
+void UCameraTools::RemovePlayerControllerHiddenActor(APlayerController* _playerController, AActor* _actor)
+{
+	JOY_EXITCONDITION(!_playerController, TEXT("PlayerController is null."));
+	JOY_EXITCONDITION(!_actor, TEXT("Actor is null."));
+
+	_playerController->HiddenActors.Remove(_actor);
+}
+
+void UCameraTools::AddPlayerControllerHiddenPrimitiveComponent(APlayerController* _playerController, UPrimitiveComponent* _component)
+{
+	JOY_EXITCONDITION(!_playerController, TEXT("PlayerController is null."));
+	JOY_EXITCONDITION(!_component, TEXT("Component is null."));
+
+	_playerController->HiddenPrimitiveComponents.Add(_component);
+
+}
+
+void UCameraTools::RemovePlayerControllerHiddenPrimitiveComponent(APlayerController* _playerController, UPrimitiveComponent* _component)
+{
+	JOY_EXITCONDITION(!_playerController, TEXT("PlayerController is null."));
+	JOY_EXITCONDITION(!_component, TEXT("Component is null."));
+
+	_playerController->HiddenPrimitiveComponents.Remove(_component);
 }

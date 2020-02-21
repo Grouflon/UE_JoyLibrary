@@ -19,4 +19,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Joy|CameraTools", meta = (WorldContext = "_worldContextObject")) static FVector GetCurrentViewLocation(UObject* _worldContextObject);
 
 
+	UFUNCTION(BlueprintCallable, Category = "Joy|CameraTools") static void AddPlayerControllerHiddenActor(APlayerController* _playerController, AActor* _actor);
+	UFUNCTION(BlueprintCallable, Category = "Joy|CameraTools") static void RemovePlayerControllerHiddenActor(APlayerController* _playerController, AActor* _actor);
+	UFUNCTION(BlueprintCallable, Category = "Joy|CameraTools") static void AddPlayerControllerHiddenPrimitiveComponent(APlayerController* _playerController, UPrimitiveComponent* _component);
+	UFUNCTION(BlueprintCallable, Category = "Joy|CameraTools") static void RemovePlayerControllerHiddenPrimitiveComponent(APlayerController* _playerController, UPrimitiveComponent* _component);
+
 };

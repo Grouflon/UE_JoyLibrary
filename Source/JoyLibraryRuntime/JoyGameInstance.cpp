@@ -7,16 +7,21 @@
 #include <Engine/Engine.h>
 #include <Kismet/GameplayStatics.h>
 #include <UObjectIterator.h>
+#include <AssetRegistryModule.h>
 
 #include <Manager.h>
 #include <Assert.h>
 #include <Draw.h>
+#include <JoyLibrarySettings.h>
+ 
 
 void UJoyGameInstance::OnStart()
 {
 	Super::OnStart();
 
 	AHUD::OnShowDebugInfo.AddUObject(this, &UJoyGameInstance::_OnHudShowDebugInfo);
+
+	FWorldDelegates::OnPostWorldInitialization.AddUObject(this, &UJoyGameInstance::_OnPostWorldInitialization);
 
 	// FORCE MANAGERS INSTANTIATION
 	_InstantiateManagers();
@@ -29,8 +34,20 @@ void UJoyGameInstance::Shutdown()
 	Super::Shutdown();
 }
 
-AManager* UJoyGameInstance::GetManager(TSubclassOf<AManager> _managerClass) const
+AManager* UJoyGameInstance::GetManager(TSubclassOf<AManager> _managerClass, UObject* _worldContextObject /*= nullptr*/) const
 {
+	UWorld* world = nullptr;
+	if (_worldContextObject)
+	{
+		world = _worldContextObject->GetWorld();
+	}
+	else
+	{
+		world = WorldContext->World();
+	}
+
+	JOY_ASSERT(world);
+
 	for (int32 i = 0; i < m_managers.Num();)
 	{
 		AManager* manager = m_managers[i];
@@ -48,17 +65,33 @@ AManager* UJoyGameInstance::GetManager(TSubclassOf<AManager> _managerClass) cons
 		}
 	}
 
-	// NO MANAGER FOUND, INSTANTIATE IT
-#if JOY_ASSERT_ENABLED
 	TArray<AActor*> actors;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), _managerClass, actors);
-	JOY_ASSERT_MSGF(actors.Num() == 0, TEXT("%s already instanced in the world. Please remove it."), *_managerClass->GetName());
-#endif
+	UGameplayStatics::GetAllActorsOfClass(world, _managerClass, actors);
+	JOY_ASSERT_MSGF(actors.Num() <= 1, TEXT("More than one Manager %s Instantiated in world. I have a bad feeling about this."), *_managerClass->GetName());
 
-	TSubclassOf<AManager> deepestChildClass = _FindDeepestChildClass(_managerClass);
-	if (deepestChildClass.Get())
+	// NO MANAGER FOUND, INSTANTIATE IT
+
+	if (actors.Num() == 0)
 	{
-		AManager* manager = GetWorld()->SpawnActor<AManager>(deepestChildClass);
+		TSubclassOf<AManager> deepestChildClass = _FindDeepestChildClass(_managerClass);
+		if (deepestChildClass.Get())
+		{
+			FActorSpawnParameters actorSpawnParameters;
+			actorSpawnParameters.bDeferConstruction = true;
+			actorSpawnParameters.bAllowDuringConstructionScript= true;
+
+			AManager* manager = world->SpawnActorAbsolute<AManager>(deepestChildClass, FTransform::Identity, actorSpawnParameters);
+			JOY_ASSERT(manager);
+			m_managers.Add(manager);
+
+			UGameplayStatics::FinishSpawningActor(manager, FTransform::Identity);
+
+			return manager;
+		}
+	}
+	else
+	{
+		AManager* manager = Cast<AManager>(actors[0]);
 		JOY_ASSERT(manager);
 		m_managers.Add(manager);
 		return manager;
@@ -118,7 +151,12 @@ void UJoyGameInstance::DrawDebugCurve(UCurveFloat* _curve, ECoordinatesOrigin _c
 	m_debugCurveData.Add(data);
 }
 
-void UJoyGameInstance::_InstantiateManagers()
+void UJoyGameInstance::_OnPostWorldInitialization(UWorld* World, const UWorld::InitializationValues IVS)
+{
+	_InstantiateManagers(World);
+}
+
+void UJoyGameInstance::_InstantiateManagers(UWorld* _world /*= nullptr*/)
 {
 	for (TObjectIterator<UClass> it; it; ++it)
 	{
@@ -126,7 +164,7 @@ void UJoyGameInstance::_InstantiateManagers()
 		if (!clss->IsChildOf(AManager::StaticClass()) || clss == AManager::StaticClass())
 			continue;
 
-		GetManager(clss);
+		GetManager(clss, _world);
 	}
 }
 

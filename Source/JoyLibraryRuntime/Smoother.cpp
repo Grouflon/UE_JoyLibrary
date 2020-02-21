@@ -1,7 +1,12 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Smoother.h"
+
+#include <Curves/CurveFloat.h>
+
 #include <Assert.h>
+#include <CurveTools.h>
+#include <Draw.h>
 
 void DampSpring(FQuat& _v0, const FQuat& _target, FQuat& _vel, float _time90, float _dt)
 {
@@ -38,6 +43,21 @@ void DampSpring(FQuat& _v0, const FQuat& _target, FQuat& _vel, float _time90, fl
 
 	_v0 *= FQuat::Slerp(FQuat::Identity, _vel, c0);
 	_vel *= FQuat::Slerp(FQuat::Identity, force, c0);
+}
+
+FQuat Average(const TArray<FQuat>& _samples)
+{
+	JOY_ASSERT(_samples.Num() > 0);
+
+	// NOTE(Remi|2019/12/11): Code adapted from routine found here: https://forum.unity.com/threads/average-quaternions.86898/
+	FQuat average = FQuat(0.f, 0.f, 0.f, 0.f);
+	float weight;
+	for (int i = 1; i < _samples.Num(); i++)
+	{
+		weight = 1.0f / (float)(i + 1);
+		average = FQuat::SlerpFullPath_NotNormalized(average, _samples[i], weight);
+	}
+	return average.GetNormalized();
 }
 
 void USmoother::ResetSmootherFloat(FSmootherFloat& _smoother, float _value /*= 0.f*/)
@@ -110,4 +130,198 @@ FRotator USmoother::SmoothRotation(FSmootherRotation& _smoother, FRotator _targe
 void USmoother::SetTimeTo90PercentRotation(FSmootherRotation& _smoother, float _timeTo90Percent)
 {
 	_smoother.TimeTo90Percent = _timeTo90Percent;
+}
+
+float FSmootherCurved::Update(float _target, float _dt)
+{
+	_target = FMath::Clamp(_target, 0.f, 1.f);
+
+	// STATE CHANGE
+	float velocityDiff = _target - m_value;
+	if (FMath::IsNearlyZero(velocityDiff, m_velocityChangeThreshold))
+	{
+		m_accelerationState = AS_Stable;
+	}
+	else
+	{
+		if (velocityDiff < -m_velocityChangeThreshold)
+		{
+			m_currentCurve = m_decelerationCurve;
+			m_accelerationState = AS_Decelerating;
+		}
+		else
+		{
+			m_currentCurve = m_accelerationCurve;
+			m_accelerationState = AS_Accelerating;
+		}
+
+		if (m_currentCurve)
+		{
+			bool result = FindTimeOnCurveForValue(m_currentCurve, m_value, &m_currentTimeOnCurve);
+			JOY_ASSERT(result);
+		}
+		else
+		{
+			m_currentTimeOnCurve = 0.f;
+		}
+	}
+
+	// PROCESS
+	if (m_accelerationState != AS_Stable)
+	{
+		m_currentTimeOnCurve += _dt;
+
+		if (m_currentCurve)
+		{
+			m_value = m_currentCurve->GetFloatValue(m_currentTimeOnCurve);
+
+			if ((m_accelerationState == AS_Accelerating && m_value > _target) || (m_accelerationState == AS_Decelerating && m_value < _target))
+			{
+				bool result = FindTimeOnCurveForValue(m_currentCurve, m_value, &m_currentTimeOnCurve);
+				JOY_ASSERT(result);
+			}
+		}
+		else
+		{
+			m_value = _target;
+		}
+	}
+	else
+	{
+		m_value = _target;
+	}
+
+	return m_value;
+}
+
+void FSmootherCurved::SetAccelerationCurve(UCurveFloat* _curve)
+{
+	if (_curve == m_accelerationCurve)
+		return;
+
+	m_accelerationCurve = _curve;
+	if (m_accelerationState == AS_Accelerating && m_accelerationCurve)
+	{
+		bool result = FindTimeOnCurveForValue(m_accelerationCurve, m_value, &m_currentTimeOnCurve);
+		JOY_ASSERT(result);
+	}
+}
+
+void FSmootherCurved::SetDecelerationCurve(UCurveFloat* _curve)
+{
+	if (_curve == m_decelerationCurve)
+		return;
+
+	m_decelerationCurve = _curve;
+	if (m_accelerationState == AS_Decelerating && m_decelerationCurve)
+	{
+		bool result = FindTimeOnCurveForValue(m_decelerationCurve, m_value, &m_currentTimeOnCurve);
+		JOY_ASSERT(result);
+	}
+}
+
+void FSmootherCurved::SetValue(float _value)
+{
+	m_value = _value;
+	m_accelerationState = AS_Stable;
+	m_currentTimeOnCurve = 0.f;
+	m_currentCurve = nullptr;
+}
+
+void FSmootherCurved::DisplayDebug(UCanvas* _canvas, const FBox2D& _location)
+{
+	if (m_currentCurve)
+	{
+		float firstKeyTime = 0.f;
+		float lastKeyTime = 0.f;
+		m_currentCurve->GetCurves()[0].CurveToEdit->GetTimeRange(firstKeyTime, lastKeyTime);
+		float time = m_currentTimeOnCurve;
+		FindTimeOnCurveForValue(m_currentCurve, m_value, &time);
+		DrawDebugCanvasCurve(_canvas, m_currentCurve, _location, firstKeyTime, lastKeyTime, time, m_currentCurve->GetName());
+	}
+}
+
+float USmoother::SmootherCurvedTick(FSmootherCurved& _smoother, float _target, float _dt)
+{
+	return _smoother.Update(_target, _dt);
+}
+
+float USmoother::SmootherCurvedGetValue(const FSmootherCurved& _smoother)
+{
+	return _smoother.GetValue();
+}
+
+void USmoother::SmootherCurvedSetValue(FSmootherCurved& _smoother, float _value)
+{
+	_smoother.SetValue(_value);
+}
+
+void USmoother::SmootherCurvedSetAccelerationCurve(FSmootherCurved& _smoother, UCurveFloat* _curve)
+{
+	_smoother.SetAccelerationCurve(_curve);
+}
+
+void USmoother::SmootherCurvedSetDecelerationCurve(FSmootherCurved& _smoother, UCurveFloat* _curve)
+{
+	_smoother.SetDecelerationCurve(_curve);
+}
+
+void USmoother::ResetNoiseSmootherFloat(FNoiseSmootherFloat& _noiseSmoother, float _value)
+{
+	_noiseSmoother.Reset(_value);
+}
+
+float USmoother::UpdateNoiseSmootherFloat(FNoiseSmootherFloat& _noiseSmoother, float _dt, float _value)
+{
+	return _noiseSmoother.Update(_dt, _value);
+}
+
+float USmoother::GetNoiseSmootherFloatValue(FNoiseSmootherFloat& _noiseSmoother)
+{
+	return _noiseSmoother.GetValue();
+}
+
+void USmoother::ResetNoiseSmootherVector(FNoiseSmootherVector& _noiseSmoother, FVector _value)
+{
+	_noiseSmoother.Reset(_value);
+}
+
+FVector USmoother::UpdateNoiseSmootherVector(FNoiseSmootherVector& _noiseSmoother, float _dt, FVector _value)
+{
+	return _noiseSmoother.Update(_dt, _value);
+}
+
+FVector USmoother::GetNoiseSmootherVectorValue(FNoiseSmootherVector& _noiseSmoother)
+{
+	return _noiseSmoother.GetValue();
+}
+
+void USmoother::ResetNoiseSmootherVector2D(FNoiseSmootherVector2D& _noiseSmoother, FVector2D _value)
+{
+	_noiseSmoother.Reset(_value);
+}
+
+FVector2D USmoother::UpdateNoiseSmootherVector2D(FNoiseSmootherVector2D& _noiseSmoother, float _dt, FVector2D _value)
+{
+	return _noiseSmoother.Update(_dt, _value);
+}
+
+FVector2D USmoother::GetNoiseSmootherVector2DValue(FNoiseSmootherVector2D& _noiseSmoother)
+{
+	return _noiseSmoother.GetValue();
+}
+
+void USmoother::ResetNoiseSmootherRotation(FNoiseSmootherRotation& _noiseSmoother, FRotator _value)
+{
+	_noiseSmoother.Reset(_value.Quaternion());
+}
+
+FRotator USmoother::UpdateNoiseSmootherRotation(FNoiseSmootherRotation& _noiseSmoother, float _dt, FRotator _value)
+{
+	return _noiseSmoother.Update(_dt, _value.Quaternion()).Rotator();
+}
+
+FRotator USmoother::GetNoiseSmootherRotationValue(FNoiseSmootherRotation& _noiseSmoother)
+{
+	return _noiseSmoother.GetValue().Rotator();
 }

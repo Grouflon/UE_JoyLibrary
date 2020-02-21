@@ -3,6 +3,8 @@
 #include <Components/InputComponent.h>
 #include <GameFramework/PlayerInput.h>
 #include <GameFramework/PlayerController.h>
+#include <Engine/Engine.h>
+#include <Engine/GameViewportClient.h>
 
 #include <Assert.h>
 
@@ -87,8 +89,11 @@ void RemoveAxisBinding(UInputComponent* _inputComponent, const FName& _axisName)
 
 bool IsActionBindingPressed(APlayerController* _playerController, UInputComponent* _inputComponent, const FName& _actionName)
 {
-	JOY_ASSERT(_playerController);
-	JOY_ASSERT(_inputComponent);
+	if (!_playerController)
+		return false;
+
+	if (!_inputComponent)
+		return false;
 
 	for (uint16 i = 0; i < _inputComponent->GetNumActionBindings(); ++i)
 	{
@@ -105,4 +110,63 @@ bool IsActionBindingPressed(APlayerController* _playerController, UInputComponen
 		}
 	}
 	return false;
+}
+
+bool UInputTools::InputKey(APlayerController* _playerController, FKey Key, enum EInputEvent Event)
+{
+	if (!_playerController)
+		return false;
+
+	return _playerController->InputKey(Key, Event, 1.f, Key.IsGamepadKey());
+}
+
+bool UInputTools::InputAxis(APlayerController* _playerController, FKey Key, float Delta, float DeltaTime)
+{
+	if (!_playerController)
+		return false;
+
+	return _playerController->InputAxis(Key, Delta, DeltaTime, 1, Key.IsGamepadKey());
+}
+
+void UInputTools::SetViewportIgnoreInput(bool _value)
+{
+	if (GEngine && GEngine->GameViewport)
+	{
+		GEngine->GameViewport->SetIgnoreInput(_value);
+	}
+}
+
+bool UInputTools::IsAltPressed(const APlayerController* _playerController)
+{
+	JOY_EXITCONDITION_RET(!_playerController, false, "Invalid playerController argument");
+
+	return _playerController->PlayerInput->IsAltPressed();
+}
+
+bool UInputTools::IsCtrlPressed(const APlayerController* _playerController)
+{
+	JOY_EXITCONDITION_RET(!_playerController, false, "Invalid playerController argument");
+
+	return _playerController->PlayerInput->IsCtrlPressed();
+}
+
+bool UInputTools::IsShiftPressed(const APlayerController* _playerController)
+{
+	JOY_EXITCONDITION_RET(!_playerController, false, "Invalid playerController argument");
+
+	return _playerController->PlayerInput->IsShiftPressed();
+}
+
+bool UInputTools::IsCmdPressed(const APlayerController* _playerController)
+{
+	JOY_EXITCONDITION_RET(!_playerController, false, "Invalid playerController argument");
+
+	return _playerController->PlayerInput->IsCmdPressed();
+}
+
+float UInputTools::GetTimeDown(const APlayerController* _playerController, FKey InKey)
+{
+	JOY_EXITCONDITION_RET(!_playerController, 0.f, "Invalid playerController argument");
+
+	return _playerController->PlayerInput->GetTimeDown(InKey);
 }

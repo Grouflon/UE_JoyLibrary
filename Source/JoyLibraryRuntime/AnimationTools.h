@@ -12,6 +12,7 @@ JOYLIBRARYRUNTIME_API float GetAnimationStateRelevantAnimTimeRemaining(UAnimInst
 JOYLIBRARYRUNTIME_API float GetAnimationStateRelevantAnimTimeRemainingFraction(UAnimInstance* _animInstance, FName _stateMachineName, FName _stateName);
 JOYLIBRARYRUNTIME_API const FAnimNotifyEvent* FindAnimationNotify(const UAnimSequence* _animation, FName _notifyName);
 JOYLIBRARYRUNTIME_API float FindAnimationNotifyTriggerTime(const UAnimSequence* _animation, FName _notifyName);
+JOYLIBRARYRUNTIME_API float FindStateMachineTransitionCrossFadeTime(UAnimInstance* _animInstance, FName _stateMachineName, FName _sourceStateName, FName _targetStateName);
 
 JOYLIBRARYRUNTIME_API bool GetBoneChain(const USkeletalMeshComponent* _skeletalMesh, const FName& _firstBone, const FName& _lastBone, TArray<FName>& _outChain);
 JOYLIBRARYRUNTIME_API bool GetBoneChain(const USkeleton* _skeleton, const FName& _firstBone, const FName& _lastBone, TArray<FName>& _outChain);
@@ -33,6 +34,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Joy|Animation") static bool GetBoneChain(const USkeletalMeshComponent* _skeletalMesh, const FName& _firstBone, const FName& _lastBone, TArray<FName>& _outChain);
 
 	UFUNCTION(BlueprintCallable, Category = "Joy|Animation") static FTransform ExtractRootMotionFromRange(const UAnimSequence* _animationSequence, float _startTrackPosition, float _endTrackPosition);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Animation") static FTransform ExtractRootTrackTransform(const UAnimSequence* _animationSequence, float _pos);
+
 	UFUNCTION(BlueprintPure, Category = "Joy|Animation") static float GetPlayLength(const UAnimSequence* _animationSequence);
 
 	UFUNCTION(BlueprintCallable, Category = "Joy|Animation") static void RefreshAnimationCache(UAnimSequence* _animationSequence);

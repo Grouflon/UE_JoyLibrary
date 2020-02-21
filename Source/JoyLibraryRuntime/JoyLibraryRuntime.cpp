@@ -2,20 +2,42 @@
 
 #include "JoyLibraryRuntime.h"
 
+#include <ISettingsModule.h>
+#include <ISettingsSection.h>
+#include <IConsoleManager.h>
+
+#include <JoyLibrarySettings.h>
+
 #define LOCTEXT_NAMESPACE "FJoyLibraryRuntimeModule"
 
 void FJoyLibraryRuntimeModule::StartupModule()
 {
-	int a = 0;
-	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
+	ISettingsModule* settingsModule = FModuleManager::GetModulePtr<ISettingsModule>("Settings");
+	if (settingsModule != nullptr)
+	{
+		settingsModule->RegisterSettings("Project", "Plugins", "JoyLibrary",
+			LOCTEXT("JoyLibraryName", "Joy Library"),
+			LOCTEXT("JoyLibraryDescription", "Configure Joy Library."),
+			GetMutableDefault<UJoyLibrarySettings>()
+		);
+	}
+
+	m_assertEnabledConsoleVariable = IConsoleManager::Get().RegisterConsoleVariable(TEXT("joy.SkipAsserts"), 0, TEXT("Automatically skips assert windows."));
 }
 
 void FJoyLibraryRuntimeModule::ShutdownModule()
 {
-	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
-	// we call this function before unloading the module.
+	IConsoleManager::Get().UnregisterConsoleObject(m_assertEnabledConsoleVariable);
+	m_assertEnabledConsoleVariable = nullptr;
+
+	ISettingsModule* settingsModule = FModuleManager::GetModulePtr<ISettingsModule>("Settings");
+	if (settingsModule != nullptr)
+	{
+		settingsModule->UnregisterSettings("Project", "Plugins", "JoyLibrary");
+	}
 }
 
 #undef LOCTEXT_NAMESPACE
 	
 IMPLEMENT_MODULE(FJoyLibraryRuntimeModule, JoyLibraryRuntime)
+

@@ -12,6 +12,7 @@
 #include <Navigation/PathFollowingComponent.h>
 #include <NavigationPath.h>
 #include <AIController.h>
+#include <Engine/LevelStreaming.h>
 
 #include <Assert.h>
 #include <DebugTools.h>
@@ -70,22 +71,30 @@ int UJoyBlueprintFunctionLibrary::HashString(const FString& _string)
 
 void UJoyBlueprintFunctionLibrary::SetShapeNavigationRelevancy(UShapeComponent* _shapeComponent, bool _relevancy)
 {
+	JOY_EXITCONDITION(!_shapeComponent, TEXT("Undefined ShapeComponent."));
+
 	_shapeComponent->SetCanEverAffectNavigation(_relevancy);
 }
 
 bool UJoyBlueprintFunctionLibrary::GetShapeNavigationRelevancy(UShapeComponent* _shapeComponent)
 {
+	JOY_EXITCONDITION_RET(!_shapeComponent, false, TEXT("Undefined ShapeComponent."));
+
 	return _shapeComponent->CanEverAffectNavigation();
 }
 
 void UJoyBlueprintFunctionLibrary::GetPathComponentCurrentPath(const UPathFollowingComponent* _pathFollowingComponent, UNavigationPath* _outPath)
 {
+	JOY_EXITCONDITION(!_pathFollowingComponent, TEXT("Undefined PathFollowingComponent."));
+
 	const FNavPathSharedPtr Path = _pathFollowingComponent->GetPath();
 	_outPath->SetPath(Path);
 }
 
 float UJoyBlueprintFunctionLibrary::GetPathComponentRemainingLength(const UPathFollowingComponent* _pathFollowingComponent)
 {
+	JOY_EXITCONDITION_RET(!_pathFollowingComponent, 0.f, TEXT("Undefined PathFollowingComponent."));
+
 	if (!_pathFollowingComponent->GetPath().IsValid() || _pathFollowingComponent->GetPath()->GetPathPoints().Num() == 0)
 		return 0.f;
 
@@ -95,81 +104,15 @@ float UJoyBlueprintFunctionLibrary::GetPathComponentRemainingLength(const UPathF
 
 bool UJoyBlueprintFunctionLibrary::HasActorBegunPlay(const AActor* _actor)
 {
+	JOY_EXITCONDITION_RET(!_actor, false, TEXT("Unspecified Actor."));
+
 	return _actor->HasActorBegunPlay();
-}
-
-float UJoyBlueprintFunctionLibrary::GetAngleBetweenRotators(const FRotator& _A, const FRotator& _B)
-{
-	return FMath::RadiansToDegrees(_A.Quaternion().AngularDistance(_B.Quaternion()));
-}
-
-float UJoyBlueprintFunctionLibrary::GetSignedAngleBetweenRotators(const FRotator& _A, const FRotator& _B)
-{
-	return FMath::RadiansToDegrees(SignedAngleBetween(_A.Quaternion().GetForwardVector(), _B.Quaternion().GetForwardVector(), _A.Quaternion().GetUpVector()));
-}
-
-FVector UJoyBlueprintFunctionLibrary::GetXY(const FVector& _vector)
-{
-	return ::GetXY(_vector);
-}
-
-FVector2D UJoyBlueprintFunctionLibrary::GetXY2D(const FVector& _vector)
-{
-	return ::GetXY2D(_vector);
-}
-
-FVector UJoyBlueprintFunctionLibrary::GetXZ(const FVector& _vector)
-{
-	return ::GetXZ(_vector);
-}
-
-FVector2D UJoyBlueprintFunctionLibrary::GetXZ2D(const FVector& _vector)
-{
-	return ::GetXZ2D(_vector);
-}
-
-FVector UJoyBlueprintFunctionLibrary::GetYZ(const FVector& _vector)
-{
-	return ::GetYZ(_vector);
-}
-
-FVector2D UJoyBlueprintFunctionLibrary::GetYZ2D(const FVector& _vector)
-{
-	return ::GetYZ2D(_vector);
-}
-
-float UJoyBlueprintFunctionLibrary::ComputeSquaredDistanceToPoint(const FBox2D& _box, const FVector2D& _point)
-{
-	return _box.ComputeSquaredDistanceToPoint(_point);
-}
-
-float UJoyBlueprintFunctionLibrary::AngleBetween(const FVector& _A, const FVector& _B)
-{
-	return FMath::RadiansToDegrees(::AngleBetween(_A, _B));
-}
-
-float UJoyBlueprintFunctionLibrary::SignedAngleBetween(const FVector& _A, const FVector& _B, FVector _UpVector/* = FVector::UpVector*/)
-{
-	return FMath::RadiansToDegrees(::SignedAngleBetween(_A, _B, _UpVector));
-}
-
-FVector UJoyBlueprintFunctionLibrary::GetRandomPointAroundLocationInTorus(FVector _location, FVector _direction, float _innerRadius, float _outterRadius)
-{
-	return (::GetRandomPointAroundLocationInTorus(_location, _direction, _innerRadius, _outterRadius));
-}
-
-FVector UJoyBlueprintFunctionLibrary::GetPredictedShootLocation(FVector _fromLocation, FVector _targetLocation, FVector _targetVelocity, float _projectileSpeed)
-{
-	return (::GetPredictedShootLocation(_fromLocation, _targetLocation, _targetVelocity, _projectileSpeed));
-}
-
-float UJoyBlueprintFunctionLibrary::FindDistanceAlongSplineClosestToWorldLocation(const USplineComponent* _spline, const FVector& _worldLocation)
-{
-	return ::FindDistanceAlongSplineClosestToWorldLocation(_spline, _worldLocation);
 }
 
 FBox UJoyBlueprintFunctionLibrary::GetActorVisualBounds(const AActor* _actor)
 {
+	JOY_EXITCONDITION_RET(!_actor, FBox(), TEXT("Unspecified Actor."));
+
 	TArray<UActorComponent*> staticMeshComponents = _actor->GetComponentsByClass(UStaticMeshComponent::StaticClass());
 	if (staticMeshComponents.Num() == 0)
 		return FBox(_actor->GetActorLocation(), _actor->GetActorLocation());
@@ -216,6 +159,28 @@ float UJoyBlueprintFunctionLibrary::GetBoxRadius(const FBox& _box)
 	return _box.GetExtent().Size();
 }
 
+FName UJoyBlueprintFunctionLibrary::CollisionProfileNameToName(const FCollisionProfileName& _collisionProfileName)
+{
+	return _collisionProfileName.Name;
+}
+
+FName UJoyBlueprintFunctionLibrary::GetLevelAssetName(const ULevel* _level)
+{
+	return _level->GetOuter()->GetFName();
+}
+
+FName UJoyBlueprintFunctionLibrary::GetLevelStreamingAssetName(const ULevelStreaming* _levelStreaming)
+{
+	FString baseFileName = FPaths::GetBaseFilename(_levelStreaming->GetWorldAssetPackageName());
+	baseFileName.RemoveFromStart(_levelStreaming->GetWorld()->StreamingLevelsPrefix);
+	return FName(*baseFileName);
+}
+
+bool UJoyBlueprintFunctionLibrary::IsWorldTearingDown(UObject* _worldContextObject)
+{
+	return _worldContextObject->GetWorld()->bIsTearingDown;
+}
+
 void UJoyBlueprintFunctionLibrary::DrawDebugCurve(UObject* _worldContextObject, UCurveFloat* _curve, ECoordinatesOrigin _coordinatesOrigin, FVector2D _position, FVector2D _size, float _curveXMin, float _curveXMax, float _curveValue, const FString& _curveName, FColor _curveColor , FColor _valueColor , int _samplesCount)
 {
 	if (!_curve)
@@ -231,3 +196,32 @@ void UJoyBlueprintFunctionLibrary::DrawDebugCurve(UObject* _worldContextObject, 
 		joyGameInstance->DrawDebugCurve(_curve, _coordinatesOrigin, _position, _size, _curveXMin, _curveXMax, _curveValue, _curveName, _curveColor, _valueColor, _samplesCount);
 	}
 }
+
+void UJoyBlueprintFunctionLibrary::LogError(UObject* WorldContextObject, const FString _errorMessage)
+{
+	LOG_ERROR(*FString(WorldContextObject->GetName() + " : ").Append(_errorMessage));
+}
+
+void UJoyBlueprintFunctionLibrary::LogWarning(UObject* WorldContextObject, const FString _warningMessage)
+{
+	LOG_WARNING(*FString(WorldContextObject->GetName() + " : ").Append(_warningMessage));
+}
+
+void UJoyBlueprintFunctionLibrary::DebugBreak()
+{
+	if (FGenericPlatformMisc::IsDebuggerPresent())
+	{
+		__debugbreak();
+	}
+}
+
+AActor* UJoyBlueprintFunctionLibrary::BeginDeferredActorSpawnFromClass(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass, const FTransform& SpawnTransform, ESpawnActorCollisionHandlingMethod CollisionHandlingOverride /*= ESpawnActorCollisionHandlingMethod::Undefined*/, AActor* Owner /*= nullptr*/)
+{
+	return UGameplayStatics::BeginDeferredActorSpawnFromClass(WorldContextObject, ActorClass, SpawnTransform, CollisionHandlingOverride, Owner);
+}
+
+AActor* UJoyBlueprintFunctionLibrary::FinishSpawningActor(AActor* Actor, const FTransform& SpawnTransform)
+{
+	return UGameplayStatics::FinishSpawningActor(Actor, SpawnTransform);
+}
+

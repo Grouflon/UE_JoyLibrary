@@ -4,6 +4,7 @@
 #include <Log.h>
 
 #include <MessageDialog.h>
+#include <IConsoleManager.h>
 
 #ifdef UE_EDITOR
 	#define JOY_ASSERT_ENABLED 1
@@ -16,109 +17,78 @@
 	static TArray<FName> s_bypassedAsserts;
 
 	#if PLATFORM_PS4
-		#define JOY_ASSERT(condition)\
+		#define _JOY_ASSERT_FAILED(condition, msg)\
 		{\
 			if (FGenericPlatformMisc::IsDebuggerPresent())\
 			{\
-				if (!(condition)) \
-					__debugbreak();\
+				__debugbreak(); \
 			}\
 			else\
 			{\
-				check(condition);\
+				checkf(condition, TEXT("%s"), msg); \
 			}\
 		}
-
-		#define JOY_ASSERT_MSGF(condition, fmt, ...)\
-		{\
-			if (FGenericPlatformMisc::IsDebuggerPresent())\
-			{\
-				if (!(condition)) \
-					__debugbreak();\
-			}\
-			else\
-			{\
-				checkf(condition, (fmt), __VA_ARGS__); \
-			}\
-		}
-
+		
 	#else
-		#define JOY_ASSERT(condition)\
+		#define _JOY_ASSERT_FAILED(condition, msg)\
 		{\
-			if (!(condition))\
+			FName __key = FName(*FString::Printf(TEXT("%s%d"), TEXT(__FILE__), __LINE__));\
+			if (s_bypassedAsserts.Find(__key) == INDEX_NONE)\
 			{\
-				FName __key = FName(*FString::Printf(TEXT("%s%d"), TEXT(__FILE__), __LINE__));\
-				if (s_bypassedAsserts.Find(__key) == INDEX_NONE)\
+				EAppReturnType::Type __ret = FMessageDialog::Open(\
+					EAppMsgType::YesNoCancel,\
+					FText::FromString(FString::Printf(TEXT("%s[%s:%d -> %s]\n\n[Assertion failed] => " #condition "\n\nYes\t\t\t-> Crash and generate dump\nNo\t\t\t\t-> Pass Assert\nCancel\t-> Deactivate Assert"), (msg), *FString(__FILENAME__), __LINE__, *FString(__FUNCTION__)))\
+				); \
+				switch (__ret)\
 				{\
-					EAppReturnType::Type __ret = FMessageDialog::Open(\
-						EAppMsgType::YesNoCancel,\
-						FText::FromString(FString::Printf(TEXT("[%s:%d -> %s]\n\n[Assertion failed] => " #condition "\n\nYes\t\t\t-> Crash and generate dump\nNo\t\t\t\t-> Pass Assert\nCancel\t-> Deactivate Assert"), *FString(__FILENAME__), __LINE__, *FString(__FUNCTION__)))\
-					); \
-					switch (__ret)\
+				case EAppReturnType::Yes:\
+				{\
+					if (FGenericPlatformMisc::IsDebuggerPresent())\
 					{\
-					case EAppReturnType::Yes:\
-					{\
-						if (FGenericPlatformMisc::IsDebuggerPresent())\
-						{\
-							__debugbreak();\
-						}\
-						else\
-						{\
-							check(condition);\
-						}\
+						__debugbreak();\
 					}\
-					break;\
-					case EAppReturnType::Cancel:\
+					else\
 					{\
-						s_bypassedAsserts.Add(__key);\
-					}\
-					break;\
-					default: break; \
+						checkf(condition, TEXT("%s"), msg);\
 					}\
 				}\
-			}\
-		}
-
-		#define JOY_ASSERT_MSGF(condition, fmt, ...)\
-		{\
-			if (!(condition))\
-			{\
-				FName __key = FName(*FString::Printf(TEXT("%s%d"), TEXT(__FILE__), __LINE__)); \
-				if (s_bypassedAsserts.Find(__key) == INDEX_NONE)\
+				break;\
+				case EAppReturnType::Cancel:\
 				{\
-					EAppReturnType::Type __ret = FMessageDialog::Open(\
-						EAppMsgType::YesNoCancel, \
-						FText::FromString(FString::Printf(fmt TEXT("\n\n[%s:%d -> %s]\n\n[Assertion failed] -> " #condition "\n\nYes\t\t\t-> Crash and generate dump\nNo\t\t\t\t-> Pass Assert\nCancel\t-> Deactivate Assert"), __VA_ARGS__, *FString(__FILENAME__), __LINE__, *FString(__FUNCTION__)))\
-					); \
-					switch (__ret)\
-					{\
-					case EAppReturnType::Yes:\
-					{\
-						if (FGenericPlatformMisc::IsDebuggerPresent())\
-						{\
-							__debugbreak(); \
-						}\
-						else\
-						{\
-							checkf(condition, (fmt), __VA_ARGS__); \
-						}\
-					}\
-						break; \
-					case EAppReturnType::Cancel:\
-						{\
-							s_bypassedAsserts.Add(__key); \
-						}\
-							break; \
-					default: break; \
-					}\
+					s_bypassedAsserts.Add(__key);\
+				}\
+				break;\
+				default: break; \
 				}\
 			}\
 		}
 
 	#endif
+
+	#define JOY_ASSERT_MSG(condition, msg)\
+	{\
+		if (!(condition))\
+		{\
+			LOGF_ERROR(TEXT("[Assertion failed][%s:%d -> %s] => " #condition "\n%s"), *FString(__FILENAME__), __LINE__, *FString(__FUNCTION__), msg);\
+			IConsoleVariable* __cvar = IConsoleManager::Get().FindConsoleVariable(TEXT("joy.SkipAsserts"));\
+			if (__cvar && __cvar->GetInt() == 0)\
+			{\
+				_JOY_ASSERT_FAILED(condition, msg);\
+			}\
+		}\
+	}
+
+	#define JOY_ASSERT(condition)\
+		JOY_ASSERT_MSG(condition, TEXT(""))
+
+	#define JOY_ASSERT_MSGF(condition, fmt, ...)\
+	{\
+		FString __msg = FString::Printf(fmt TEXT("\n\n"), __VA_ARGS__);\
+		JOY_ASSERT_MSG(condition, *__msg);\
+	}
+
 #else
 	#define JOY_ASSERT(condition)
+	#define JOY_ASSERT_MSG(condition, msg)
 	#define JOY_ASSERT_MSGF(condition, fmt, ...)
 #endif
-
-#define JOY_ASSERT_MSG(condition, msg) JOY_ASSERT_MSGF(condition, TEXT("%s"), msg)
