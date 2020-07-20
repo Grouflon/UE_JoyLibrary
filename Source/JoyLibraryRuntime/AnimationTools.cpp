@@ -5,10 +5,14 @@
 
 #include <Animation/AnimationAsset.h>
 #include <Animation/AnimInstance.h>
+#include <Animation/AnimNode_StateMachine.h>
 #include <Animation/AnimSequence.h>
 #include <Animation/AnimSingleNodeInstance.h>
 #include <Animation/AnimStateMachineTypes.h>
 #include <Animation/BlendSpaceBase.h>
+
+#include <Kismet/KismetMathLibrary.h>
+
 //#include <AnimationBlueprintLibrary.h>
 #include <Components/SkeletalMeshComponent.h>
 
@@ -193,6 +197,142 @@ bool GetBoneChain(const FReferenceSkeleton& _referenceSkeleton, const FName& _fi
 	return false;
 }
 
+FTransform ExtractBoneTransformAtTime(const UAnimSequence* _animationSequence, const FName _boneName, const float _time, const bool _extractRootMotion)
+{
+	FTransform resultTransform = FTransform::Identity;
+
+	auto _getAnimationTrackForBone = [&](FName _boneToFind) -> int
+	{
+		int boneIndex = _animationSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(_boneToFind);
+
+		TArray<FTrackToSkeletonMap> map = _animationSequence->GetRawTrackToSkeletonMapTable();
+
+		for (int i = 0; i < map.Num(); i++)
+		{
+			if (map[i].BoneTreeIndex == boneIndex)
+				return i;
+		}
+
+		return -1;
+	};
+
+	if (_animationSequence)
+	{ 
+		int boneTrackIndex = _getAnimationTrackForBone(_boneName);
+
+		if (boneTrackIndex >= 0)
+		{
+			_animationSequence->ExtractBoneTransform(_animationSequence->GetRawAnimationTrack(boneTrackIndex), resultTransform, _time);
+
+			TArray<FName> parentBoneChain;
+			GetBoneChain(_animationSequence->GetSkeleton(), _animationSequence->GetSkeleton()->GetReferenceSkeleton().GetBoneName(0), _boneName, parentBoneChain);
+
+			if (parentBoneChain.Num() > 1)
+			{
+				FTransform parentBoneTransform = FTransform::Identity;
+
+				for (int x = parentBoneChain.Num() - 1; x >= 0; x--)
+				{
+					if (parentBoneChain[x] == _boneName)
+						continue;
+
+					if (!_extractRootMotion && x == 0)
+						continue;
+
+					_animationSequence->ExtractBoneTransform(_animationSequence->GetRawAnimationTrack(_getAnimationTrackForBone(parentBoneChain[x])),
+						parentBoneTransform,
+						_time);
+
+					resultTransform.SetLocation(UKismetMathLibrary::TransformLocation(parentBoneTransform, resultTransform.GetLocation()));
+					resultTransform.SetRotation(UKismetMathLibrary::TransformRotation(parentBoneTransform, resultTransform.GetRotation().Rotator()).Quaternion());
+				}
+			}
+		}
+	}
+
+	return resultTransform;
+}
+
+FTransform ExtractRootTrackTransformFromBlendsapce(const UBlendSpaceBase* _blendSpace, const float _posx, const float _posy, const float _time)
+{
+	FTransform resultTransform = FTransform::Identity;
+
+	if (_blendSpace)
+	{
+		TArray<FBlendSampleData> outBlendSamplesData;
+		_blendSpace->GetSamplesFromBlendInput(FVector(_posx, _posy, 0.f), outBlendSamplesData);
+
+		FTransform accumulatedBlendSpaceRootMotionTransform = FTransform::Identity;
+
+		for (int i = 0; i < outBlendSamplesData.Num(); i++)
+		{
+			float extractAtTime = _time;
+			float currentSamplePlayLength = outBlendSamplesData[i].Animation->GetPlayLength();
+			float currentSamplePlayRate   = outBlendSamplesData[i].SamplePlayRate;
+			float currentAnimationWeight  = outBlendSamplesData[i].GetWeight();
+
+			if (_time < 0.f || _time > currentSamplePlayLength)
+			{
+				extractAtTime = currentSamplePlayLength;
+			}
+
+			FTransform currentAnimationTransform = outBlendSamplesData[i].Animation->ExtractRootTrackTransform(extractAtTime, NULL);
+
+			accumulatedBlendSpaceRootMotionTransform.AddToTranslation((currentAnimationTransform.GetLocation() * currentAnimationWeight) * currentSamplePlayRate);
+			accumulatedBlendSpaceRootMotionTransform.ConcatenateRotation(((currentAnimationTransform.GetRotation().Rotator() * currentAnimationWeight) * currentSamplePlayRate).Quaternion());
+		}
+
+		resultTransform = accumulatedBlendSpaceRootMotionTransform;
+	}
+
+	return resultTransform;
+}
+
+FAnimStateMachineDump DumpAnimStateMachine(UAnimInstance* _animInstance, FName _stateMachineName)
+{
+	FAnimStateMachineDump result;
+	result.StateMachineName = _stateMachineName;
+
+	if (!_animInstance)
+		return result;
+
+	int32 machineIndex = _animInstance->GetStateMachineIndex(_stateMachineName);
+	if (machineIndex == INDEX_NONE)
+		return result;
+
+	FAnimNode_StateMachine* instance = _animInstance->GetStateMachineInstance(machineIndex);
+	if (!instance)
+		return result;
+
+	const FBakedAnimationStateMachine* instanceDesc = _animInstance->GetStateMachineInstanceDesc(_stateMachineName);
+	if (!instanceDesc)
+		return result;
+
+	result.CurrentState = instance->GetCurrentStateName();
+	for (const FBakedAnimationState& state : instanceDesc->States)
+	{
+		int32 index = instanceDesc->FindStateIndex(state.StateName);
+		float weight = instance->GetStateWeight(index);
+		if (weight > 0.f)
+		{
+			result.ActiveStates.Add(FAnimStateMachineDumpState(state.StateName, weight));
+		}
+	}
+
+	for (int32 i = 0; i < instanceDesc->Transitions.Num(); ++i)
+	{
+		if (!instance->IsValidTransitionIndex(i))
+			continue;
+
+		if (!instance->IsTransitionActive(i))
+			continue;
+
+		result.ActiveTransitions.Add(FAnimStateMachineDumpTransition(instance->GetStateInfo(instanceDesc->Transitions[i].PreviousState).StateName, instance->GetStateInfo(instanceDesc->Transitions[i].NextState).StateName));
+	}
+
+	return result;
+}
+
 UAnimationAsset* UAnimationTools::GetAnimation(USkeletalMeshComponent* _skeletalMeshComponent)
 {
 	JOY_ASSERT(_skeletalMeshComponent);
@@ -241,4 +381,37 @@ void UAnimationTools::RefreshAnimationCache(UAnimSequence* _animationSequence)
 	_animationSequence->RefreshCurveData();
 #endif
 	_animationSequence->RefreshCacheData();
+}
+
+
+FTransform UAnimationTools::ExtractRootTrackTransformFromBlendsapce(const UBlendSpaceBase* _blendSpace, const float _posx, const float _posy, const float _time)
+{
+	return ::ExtractRootTrackTransformFromBlendsapce(_blendSpace, _posx, _posy, _time);
+}
+
+
+FTransform UAnimationTools::ExtractBoneTransformAtTime(const UAnimSequence* _animationSequence, const FName _boneName, const float _time, const bool _extractRootMotion)
+{
+	return ::ExtractBoneTransformAtTime(_animationSequence, _boneName, _time, _extractRootMotion);
+}
+
+FString FAnimStateMachineDump::ToString() const
+{
+	FString result;
+	result += FString::Printf(TEXT("CurrentState: %s\n"), *CurrentState.ToString());
+	result += TEXT("ActiveStates: ");
+	for (const FAnimStateMachineDumpState& state : ActiveStates)
+	{
+		result += FString::Printf(TEXT("%s(%.2f), "), *state.Name.ToString(), state.Weight);
+	}
+	result += TEXT("\n");
+
+	result += TEXT("ActiveTransitions: ");
+	for (const FAnimStateMachineDumpTransition& transition : ActiveTransitions)
+	{
+		result += FString::Printf(TEXT("%s -> %s, "), *transition.SourceState.ToString(), *transition.TargetState.ToString());
+	}
+	result += TEXT("\n");
+
+	return result;
 }

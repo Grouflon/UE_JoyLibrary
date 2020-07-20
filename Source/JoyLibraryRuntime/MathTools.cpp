@@ -2,6 +2,43 @@
 
 #include <Kismet/KismetMathLibrary.h>
 
+JOYLIBRARYRUNTIME_API bool PlanePlaneIntersection(const FPlane& _planeA, const FPlane& _planeB, const FVector* _referencePoint, FVector* _outIntersectionLinePointA, FVector* _outIntersectionLinePointB)
+{
+	if (FMath::IsNearlyEqual(FVector::DotProduct(_planeA, _planeB), 1.f, KINDA_SMALL_NUMBER))
+		return false;
+
+	FVector planeAOrigin;
+	FVector planeBOrigin;
+	if (_referencePoint)
+	{
+		planeAOrigin = ProjectPointOnPlane(*_referencePoint, _planeA);
+		planeBOrigin = ProjectPointOnPlane(*_referencePoint, _planeB);
+	}
+	else
+	{
+		planeAOrigin = _planeA * _planeA.W;
+		planeBOrigin = _planeB * _planeB.W;
+	}
+
+	FVector baseDirection = ProjectVectorOnPlane(planeBOrigin - planeAOrigin, _planeA).GetSafeNormal();
+	if (baseDirection.IsNearlyZero())
+		return false;
+
+	FVector firstIntersection;
+	if (!LinePlaneIntersection(planeAOrigin, planeAOrigin + baseDirection, _planeB, &firstIntersection))
+		return false;
+
+	FVector rotatedDirection = baseDirection.RotateAngleAxis(10.f, _planeA);
+	FVector secondIntersection;
+	if (!LinePlaneIntersection(planeAOrigin, planeAOrigin + rotatedDirection, _planeB, &secondIntersection))
+		return false;
+
+	if (_outIntersectionLinePointA) *_outIntersectionLinePointA = firstIntersection;
+	if (_outIntersectionLinePointB) *_outIntersectionLinePointB = secondIntersection;
+
+	return true;
+}
+
 bool LineLineShortestRoute(const FVector& _lineA1, const FVector& _lineA2, const FVector& _lineB1, const FVector& _lineB2, FVector* _resultA /*= nullptr*/, FVector* _resultB /*= nullptr*/, float* _ARatio /*= nullptr*/, float* _BRatio /*= nullptr*/)
 {
 	// NOTE(Remi|2020/01/10): Algorithm found here: http://paulbourke.net/geometry/pointlineplane/

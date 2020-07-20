@@ -98,6 +98,39 @@ FVector USmoother::SmoothVector(FSmootherVector& _smoother, FVector _target, flo
 	return _smoother.Value;
 }
 
+void USmoother::ResetSmootherVectorByComponent(FSmootherVectorByComponent& _smoother, FVector _value /*= FVector::ZeroVector*/)
+{
+	_smoother.Value = _value;
+	_smoother.Velocity = FVector::ZeroVector;
+}
+
+void USmoother::SetTimeTo90PercentVectorByComponentX(FSmootherVectorByComponent& _smoother, float _timeTo90PercentX)
+{
+	_smoother.TimeTo90PercentX = _timeTo90PercentX;
+}
+
+void USmoother::SetTimeTo90PercentVectorByComponentY(FSmootherVectorByComponent& _smoother, float _timeTo90PercentY)
+{
+	_smoother.TimeTo90PercentY = _timeTo90PercentY;
+}
+
+void USmoother::SetTimeTo90PercentVectorByComponentZ(FSmootherVectorByComponent& _smoother, float _timeTo90PercentZ)
+{
+	_smoother.TimeTo90PercentZ = _timeTo90PercentZ;
+}
+
+FVector USmoother::SmoothVectorByComponent(FSmootherVectorByComponent& _smoother, FVector _target, float _deltaTime)
+{
+	JOY_ASSERT(!IsNaN(_target) && IsFinite(_target));
+
+	DampSpring(_smoother.Value.X, _target.X, _smoother.Velocity.X, _smoother.TimeTo90PercentX, _deltaTime);
+	DampSpring(_smoother.Value.Y, _target.Y, _smoother.Velocity.Y, _smoother.TimeTo90PercentY, _deltaTime);
+	DampSpring(_smoother.Value.Z, _target.Z, _smoother.Velocity.Z, _smoother.TimeTo90PercentZ, _deltaTime);
+;
+	JOY_ASSERT(!IsNaN(_smoother.Value) && IsFinite(_smoother.Value));
+	return _smoother.Value;
+}
+
 FRotator USmoother::GetRotator(const FSmootherRotation& _smoother)
 {
 	return _smoother.Value.Rotator();
@@ -130,6 +163,31 @@ FRotator USmoother::SmoothRotation(FSmootherRotation& _smoother, FRotator _targe
 void USmoother::SetTimeTo90PercentRotation(FSmootherRotation& _smoother, float _timeTo90Percent)
 {
 	_smoother.TimeTo90Percent = _timeTo90Percent;
+}
+
+void USmoother::ResetSmootherTransform(FSmootherTransform& _smoother, FTransform _value)
+{
+	ResetSmootherVector(_smoother.LocationSmoother, _value.GetLocation());
+	ResetSmootherRotation(_smoother.RotationSmoother, _value.GetRotation());
+	ResetSmootherVector(_smoother.ScaleSmoother, _value.GetScale3D());
+}
+
+void USmoother::SetTimeTo90PercentTransform(FSmootherTransform& _smoother, float _timeTo90Percent)
+{
+	_smoother.TimeTo90Percent = _timeTo90Percent;
+}
+
+FTransform USmoother::SmoothTransform(FSmootherTransform& _smoother, FTransform _target, float _deltaTime)
+{
+	_smoother.LocationSmoother.TimeTo90Percent = _smoother.TimeTo90Percent;
+	_smoother.RotationSmoother.TimeTo90Percent = _smoother.TimeTo90Percent;
+	_smoother.ScaleSmoother.TimeTo90Percent = _smoother.TimeTo90Percent;
+
+	SmoothVector(_smoother.LocationSmoother, _target.GetLocation(), _deltaTime);
+	SmoothRotation(_smoother.RotationSmoother, _target.GetRotation(), _deltaTime);
+	SmoothVector(_smoother.ScaleSmoother, _target.GetScale3D(), _deltaTime);
+
+	return _smoother.GetValue();
 }
 
 float FSmootherCurved::Update(float _target, float _dt)

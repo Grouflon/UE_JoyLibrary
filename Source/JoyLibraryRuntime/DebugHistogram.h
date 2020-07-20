@@ -40,7 +40,7 @@ private:
 		TArray<FData> Data;
 	};
 
-	FDataDescription* _FindOrDataDescription(FName _name);
+	FDataDescription* _FindOrAddDataDescription(FName _name);
 	FTimespan _GetMaxSamplingTimespan() const;
 
 	TMap<FName, FDataDescription> m_dataList;

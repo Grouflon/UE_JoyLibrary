@@ -17,6 +17,11 @@
 #define LOG_ERROR_CAT(Category, msg)		LOGF_ERROR_CAT(Category, "%s", msg)
 #define LOG_ERROR(msg)						LOGF_ERROR("%s", msg)
 
+#define LOGF_VERBOSE_CAT(Category, fmt, ...)	UE_LOG(Category, Verbose, TEXT("[%s:%d] " fmt), *FString(__FILENAME__), __LINE__, __VA_ARGS__)
+#define LOGF_VERBOSE(fmt, ...)					LOGF_VERBOSE_CAT(LogTemp, fmt, __VA_ARGS__)
+#define LOG_VERBOSE_CAT(Category, msg)			LOGF_VERBOSE_CAT(Category, "%s", msg)
+#define LOG_VERBOSE(msg)						LOGF_VERBOSE("%s", msg)
+
 #define LOG_VECTOR(v)					LOGF("%.2f, %.2f, %.2f", (v).X, (v).Y, (v).Z)
 #define LOG_VECTOR2D(v)					LOGF("%.2f, %.2f", (v).X, (v).Y)
 #define LOG_QUAT(q)						LOGF("%.2f, %.2f, %.2f, %.2f", (q).X, (q).Y, (q).Z, (q).W)

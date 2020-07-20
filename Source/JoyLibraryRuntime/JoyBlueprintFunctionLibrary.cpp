@@ -13,6 +13,9 @@
 #include <NavigationPath.h>
 #include <AIController.h>
 #include <Engine/LevelStreaming.h>
+#if WITH_EDITOR
+#include <Editor.h>
+#endif
 
 #include <Assert.h>
 #include <DebugTools.h>
@@ -56,6 +59,17 @@ bool UJoyBlueprintFunctionLibrary::IsPlayInEditor(UObject* _worldContextObject)
 		return _worldContextObject->GetWorld()->IsPlayInEditor();
 	}
 	
+	return false;
+}
+
+bool UJoyBlueprintFunctionLibrary::IsSimulatingInEditor()
+{
+#if WITH_EDITOR
+	if (GEditor)
+	{
+		return GEditor->bIsSimulatingInEditor || GEditor->bIsSimulateInEditorQueued;
+	}
+#endif
 	return false;
 }
 

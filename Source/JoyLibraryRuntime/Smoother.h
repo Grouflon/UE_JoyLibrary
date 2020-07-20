@@ -64,6 +64,8 @@ struct JOYLIBRARYRUNTIME_API FSmootherFloat
 {
 	GENERATED_BODY()
 
+	FSmootherFloat(float _timeTo90Percent = 0.f) : TimeTo90Percent(_timeTo90Percent) {}
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TimeTo90Percent = 0.f;
 	UPROPERTY(BlueprintReadWrite) float Value = 0.f;
 	UPROPERTY(BlueprintReadWrite) float Velocity = 0.f;
@@ -74,7 +76,27 @@ struct JOYLIBRARYRUNTIME_API FSmootherVector
 {
 	GENERATED_BODY()
 
+	FSmootherVector(float _timeTo90Percent = 0.f) : TimeTo90Percent(_timeTo90Percent) {}
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TimeTo90Percent = 0.f;
+	UPROPERTY(BlueprintReadWrite) FVector Value = FVector::ZeroVector;
+	UPROPERTY(BlueprintReadWrite) FVector Velocity = FVector::ZeroVector;
+};
+
+USTRUCT(BlueprintType)
+struct JOYLIBRARYRUNTIME_API FSmootherVectorByComponent
+{
+	GENERATED_BODY()
+
+	FSmootherVectorByComponent(float _timeTo90PercentX = 0.f, float _timeTo90PercentY = 0.f, float _timeTo90PercentZ = 0.f)
+		: TimeTo90PercentX(_timeTo90PercentX)
+		, TimeTo90PercentY(_timeTo90PercentY)
+		, TimeTo90PercentZ(_timeTo90PercentZ)
+	{}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TimeTo90PercentX = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TimeTo90PercentY = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TimeTo90PercentZ = 0.f;
 	UPROPERTY(BlueprintReadWrite) FVector Value = FVector::ZeroVector;
 	UPROPERTY(BlueprintReadWrite) FVector Velocity = FVector::ZeroVector;
 };
@@ -84,9 +106,32 @@ struct JOYLIBRARYRUNTIME_API FSmootherRotation
 {
 	GENERATED_BODY()
 
+	FSmootherRotation(float _timeTo90Percent = 0.f) : TimeTo90Percent(_timeTo90Percent) {}
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TimeTo90Percent = 0.f;
 	UPROPERTY(BlueprintReadWrite) FQuat Value = FQuat::Identity;
 	UPROPERTY(BlueprintReadWrite) FQuat Velocity = FQuat::Identity;
+};
+
+USTRUCT(BlueprintType)
+struct JOYLIBRARYRUNTIME_API FSmootherTransform
+{
+	GENERATED_BODY()
+
+	FSmootherTransform(float _timeTo90Percent = 0.f) : TimeTo90Percent(_timeTo90Percent) {}
+
+	friend class USmoother;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TimeTo90Percent = 0.f;
+
+	FTransform GetValue() const
+	{
+		return FTransform(RotationSmoother.Value, LocationSmoother.Value, ScaleSmoother.Value);
+	}
+
+	FSmootherVector LocationSmoother;
+	FSmootherRotation RotationSmoother;
+	FSmootherVector ScaleSmoother;
 };
 
 USTRUCT(BlueprintType)
@@ -128,7 +173,7 @@ struct FNoiseSmootherT
 {
 	void Reset(T _value)
 	{
-		m_time = 0.f;
+		m_time = 0.0;
 		m_rawSamples.Empty();
 		m_value = _value;
 	}
@@ -137,12 +182,37 @@ struct FNoiseSmootherT
 	{
 		JOY_ASSERT(_sampleCount >= 1);
 
-		m_time += _dt;
-		FSample sample;
-		sample.Time = m_time;
-		sample.Value = _value;
-		m_rawSamples.Add(sample);
+		// To avoid loosing precision on m_time we simplify all updates with a delta time superior to the sampling time
+		if (_dt > _samplingTime)
+		{
+			m_rawSamples.Empty();
 
+			FSample sample;
+			sample.Time = m_time;
+			sample.Value = _value;
+			m_rawSamples.Add(sample);
+
+			m_value = _value;
+
+			return m_value;
+		}
+
+		m_time += _dt;
+
+		if (m_rawSamples.Num() > 0 && m_rawSamples.Last().Time == m_time)
+		{
+			m_rawSamples.Last().Value = _value;
+		} 
+		else
+		{
+			FSample sample;
+			sample.Time = m_time;
+			sample.Value = _value;
+			m_rawSamples.Add(sample);
+		}
+
+		int sampleCount = m_rawSamples.Num();
+		
 		m_samples.Empty();
 		m_samples.Reserve(_sampleCount);
 
@@ -151,7 +221,7 @@ struct FNoiseSmootherT
 		int currentRawSample = m_rawSamples.Num() - 1;
 		for (int i = 0u; i < _sampleCount; ++i)
 		{
-			float t = m_time - float(i) * samplingStep;
+			double t = m_time - float(i) * samplingStep;
 			T sampleValue;
 			for (int j = currentRawSample; j >= 0; --j)
 			{
@@ -160,7 +230,7 @@ struct FNoiseSmootherT
 					if (t <= m_rawSamples[j].Time && t > m_rawSamples[j - 1].Time)
 					{
 						currentRawSample = j;
-						float ratio = (t - m_rawSamples[j].Time) / (m_rawSamples[j - 1].Time - m_rawSamples[j].Time);
+						double ratio = (t - m_rawSamples[j].Time) / (m_rawSamples[j - 1].Time - m_rawSamples[j].Time);
 						sampleValue = FMath::Lerp(m_rawSamples[j].Value, m_rawSamples[j-1].Value, ratio);
 						break;
 					}
@@ -194,10 +264,10 @@ private:
 	struct FSample
 	{
 		T Value;
-		float Time = 0.f;
+		double Time = 0.0;
 	};
 
-	float m_time = 0.f;
+	double m_time = 0.0;
 	TArray<FSample> m_rawSamples;
 	TArray<T> m_samples;
 	T m_value;
@@ -306,12 +376,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SetTimeTo90PercentVector(UPARAM(ref) FSmootherVector& _smoother, float _timeTo90Percent);
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static FVector SmoothVector(UPARAM(ref) FSmootherVector& _smoother, FVector _target, float _deltaTime);
 
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void ResetSmootherVectorByComponent(UPARAM(ref) FSmootherVectorByComponent& _smoother, FVector _value = FVector::ZeroVector);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SetTimeTo90PercentVectorByComponentX(UPARAM(ref) FSmootherVectorByComponent& _smoother, float _timeTo90PercentX);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SetTimeTo90PercentVectorByComponentY(UPARAM(ref) FSmootherVectorByComponent& _smoother, float _timeTo90PercentY);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SetTimeTo90PercentVectorByComponentZ(UPARAM(ref) FSmootherVectorByComponent& _smoother, float _timeTo90PercentZ);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static FVector SmoothVectorByComponent(UPARAM(ref) FSmootherVectorByComponent& _smoother, FVector _target, float _deltaTime);
+
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void ResetSmootherRotation(UPARAM(ref) FSmootherRotation& _smoother, FRotator _value = FRotator::ZeroRotator);
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SetTimeTo90PercentRotation(UPARAM(ref) FSmootherRotation& _smoother, float _timeTo90Percent);
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static FRotator SmoothRotation(UPARAM(ref) FSmootherRotation& _smoother, FRotator _target, float _deltaTime);
 	UFUNCTION(BlueprintPure, Category = "Joy|Smoother") static FRotator GetRotator(const FSmootherRotation& _smoother);
 	static void ResetSmootherRotation(UPARAM(ref) FSmootherRotation& _smoother, FQuat _value = FQuat::Identity);
 	static FQuat SmoothRotation(UPARAM(ref) FSmootherRotation& _smoother, FQuat _target, float _deltaTime);
+
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void ResetSmootherTransform(UPARAM(ref) FSmootherTransform& _smoother, FTransform _value);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static void SetTimeTo90PercentTransform(UPARAM(ref) FSmootherTransform& _smoother, float _timeTo90Percent);
+	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static FTransform SmoothTransform(UPARAM(ref) FSmootherTransform& _smoother, FTransform _target, float _deltaTime);
 
 	UFUNCTION(BlueprintCallable, Category = "Joy|Smoother") static float SmootherCurvedTick(UPARAM(ref) FSmootherCurved& _smoother, float _target, float _dt);
 	UFUNCTION(BlueprintPure, Category = "Joy|Smoother") static float SmootherCurvedGetValue(const FSmootherCurved& _smoother);

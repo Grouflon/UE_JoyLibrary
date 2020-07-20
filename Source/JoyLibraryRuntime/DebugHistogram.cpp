@@ -9,13 +9,13 @@
 
 void FDebugHistogram::SetDataColor(FName _name, FColor _color)
 {
-	FDataDescription* dataDescription = _FindOrDataDescription(_name);
+	FDataDescription* dataDescription = _FindOrAddDataDescription(_name);
 	dataDescription->Color = _color;
 }
 
 void FDebugHistogram::ResetData(FName _name)
 {
-	FDataDescription* dataDescription = _FindOrDataDescription(_name);
+	FDataDescription* dataDescription = _FindOrAddDataDescription(_name);
 	dataDescription->Data.Empty();
 }
 
@@ -29,7 +29,7 @@ void FDebugHistogram::ResetAll()
 
 void FDebugHistogram::AddSample(FName _name, float _value)
 {
-	FDataDescription* dataDescription = _FindOrDataDescription(_name);
+	FDataDescription* dataDescription = _FindOrAddDataDescription(_name);
 
 	FData data(_value);
 	dataDescription->Data.Add(data);
@@ -164,7 +164,7 @@ void FDebugHistogram::DisplayDebug(UCanvas* _canvas, const FBox2D& _location, fl
 	}
 }
 
-FDebugHistogram::FDataDescription* FDebugHistogram::_FindOrDataDescription(FName _name)
+FDebugHistogram::FDataDescription* FDebugHistogram::_FindOrAddDataDescription(FName _name)
 {
 	FDataDescription* dataDescription = m_dataList.Find(_name);
 	if (!dataDescription)

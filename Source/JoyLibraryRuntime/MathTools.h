@@ -34,9 +34,21 @@ JOYLIBRARYRUNTIME_API FORCEINLINE bool IsNaN(FQuat _value)
 }
 
 template<>
+JOYLIBRARYRUNTIME_API FORCEINLINE bool IsNaN(FRotator _value)
+{
+	return IsNaN(_value.Pitch) || IsNaN(_value.Yaw) || IsNaN(_value.Roll);
+}
+
+template<>
 JOYLIBRARYRUNTIME_API FORCEINLINE bool IsNaN(FVector _value)
 {
 	return IsNaN(_value.X) || IsNaN(_value.Y) || IsNaN(_value.Z);
+}
+
+template<>
+JOYLIBRARYRUNTIME_API FORCEINLINE bool IsNaN(FPlane _value)
+{
+	return IsNaN(_value.X) || IsNaN(_value.Y) || IsNaN(_value.Z) || IsNaN(_value.W);
 }
 
 template<typename T>
@@ -66,6 +78,12 @@ JOYLIBRARYRUNTIME_API FORCEINLINE bool IsFinite(FQuat _value)
 JOYLIBRARYRUNTIME_API FORCEINLINE FVector ProjectPointOnPlane(const FVector& _point, const FPlane& _plane)
 {
 	return _point - _plane.GetSafeNormal() * _plane.PlaneDot(_point);
+}
+
+JOYLIBRARYRUNTIME_API FORCEINLINE FVector ProjectVectorOnPlane(const FVector& _vector, const FPlane& _plane)
+{
+	FVector planeNormal = _plane.GetSafeNormal();
+	return _vector - FVector::DotProduct(planeNormal, _vector) * planeNormal;
 }
 
 JOYLIBRARYRUNTIME_API FORCEINLINE FVector ProjectPointOnLine(const FVector& _point, const FVector& _lineA, const FVector& _lineB)
@@ -249,6 +267,28 @@ JOYLIBRARYRUNTIME_API FORCEINLINE bool SegmentIntersectionOnPlaneSpace(const FVe
 	_outIntersection = mat.TransformPosition(_outIntersection);
 	return true;
 }
+
+JOYLIBRARYRUNTIME_API FORCEINLINE bool LinePlaneIntersection(const FVector& _lineStart, const FVector& _lineEnd, const FPlane& _plane, FVector* _outIntersection = nullptr, float* _outT = nullptr)
+{
+	// NOTE(Remi|2020/04/16): Would love to use UKismetMathLibrary::LinePlaneIntersection instead of writing my own function, but it is actually a SegmentPlaneIntersection function
+	// Otherwise the code of this functions is almost just a copy paste of it
+	FVector rayDir = _lineEnd - _lineStart;
+
+	// Check ray is not parallel to plane
+	if ((rayDir | _plane) == 0.0f)
+	{
+		return false;
+	}
+
+	float t = ((_plane.W - (_lineStart | _plane)) / (rayDir | _plane));
+
+	if (_outIntersection) *_outIntersection = _lineStart + rayDir * t;
+	if (_outT) *_outT = t;
+
+	return true;
+}
+
+JOYLIBRARYRUNTIME_API bool PlanePlaneIntersection(const FPlane& _planeA, const FPlane& _planeB, const FVector* _referencePoint = nullptr, FVector* _outIntersectionLinePointA = nullptr, FVector* _outIntersectionLinePointB = nullptr);
 
 /**
    Calculate the line segment resultA > resultB that is the shortest route between

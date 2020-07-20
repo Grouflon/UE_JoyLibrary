@@ -138,7 +138,7 @@ UJoyEasingInterpolator* UJoyEasingInterpolator::StartEasingInterpolator(UObject*
 
 float UJoyEasingInterpolator::_GetRatio()
 {
-	return UEasingTools::Ease(m_easingFunction, FMath::Clamp<float>(FMath::GetRangePct(0, m_waitingTime, m_currentTime), 0.f, 1.f));
+	return UEasingTools::Ease(m_easingFunction, FMath::Clamp<float>(FMath::GetRangePct(0.0f, m_waitingTime, m_currentTime), 0.f, 1.f));
 }
 
 
@@ -171,6 +171,6 @@ float UJoyCurveInterpolator::_GetRatio()
 	if (!m_curveFloatAsset)
 		return 0.f;
 
-	return m_curveFloatAsset->GetFloatValue(FMath::GetRangePct(0, m_curveMaxRange, m_currentTime) * m_curveMaxRange);
+	return m_curveFloatAsset->GetFloatValue(FMath::GetRangePct(0.0f, m_curveMaxRange, m_currentTime) * m_curveMaxRange);
 }
 

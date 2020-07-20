@@ -35,6 +35,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Joy|Debug") static bool IsWithEditorBuild();
 	UFUNCTION(BlueprintPure, Category = "Joy|Debug") static bool IsAssertEnabled();
 	UFUNCTION(BlueprintPure, Category = "Joy|Debug", meta = (WorldContext = "_worldContextObject")) static bool IsPlayInEditor(UObject* _worldContextObject);
+	UFUNCTION(BlueprintPure, Category = "Joy|Debug") static bool IsSimulatingInEditor();
 	UFUNCTION(BlueprintCallable, Category = "Joy|Debug", meta = (WorldContext = "_worldContextObject", AdvancedDisplay = 9)) static void DrawDebugCurve(UObject* _worldContextObject, UCurveFloat* _curve, ECoordinatesOrigin _coordinatesOrigin, FVector2D _position, FVector2D _size, float _curveXMin, float _curveXMax, float _curveValue, const FString& _curveName, FColor _curveColor = FColor::Red, FColor _valueColor = FColor::Yellow, int _samplesCount = 64);
 	UFUNCTION(BlueprintCallable, Category = "Joy|Debug") static void Assert(bool _condition, FString _message);
 
